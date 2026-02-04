@@ -8,9 +8,14 @@ on:
   pull_request:
     types: [opened, edited, labeled, closed, reopened, synchronize, review_requested]
   # 3. MONITOR WORKFLOW SUCCESS/FAILURE
-  workflow_run:
-    workflows: ["Deploy to Azure 🚀", "Agent - Research Specialist 🕵️", "Agent - Blueprint Architect 🏗️", "Agent - POC Developer 💻"]
-    types: [completed, requested, in_progress]
+  # NOTE: Disabled until agent workflows are created. Uncomment when you add:
+  # - Deploy to Azure workflow
+  # - Agent - Research Specialist workflow
+  # - Agent - Blueprint Architect workflow
+  # - Agent - POC Developer workflow
+  # workflow_run:
+  #   workflows: ["Deploy to Azure 🚀", "Agent - Research Specialist 🕵️", "Agent - Blueprint Architect 🏗️", "Agent - POC Developer 💻"]
+  #   types: [completed, requested, in_progress]
   # 4. PERIODIC HEALTH CHECKS (Runs every 4 hours instead of 6 for more frequent monitoring)
   schedule:
     - cron: '0 */4 * * *'
