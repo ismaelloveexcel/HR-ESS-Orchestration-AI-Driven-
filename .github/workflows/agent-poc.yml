@@ -3,7 +3,6 @@ name: Agent - POC Developer 💻
 on:
   push:
     paths:
-      - 'tasks/03_architecture.md'
       - 'tasks/04_poc_plan.md'
   workflow_dispatch:
 
