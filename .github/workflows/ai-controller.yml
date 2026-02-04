@@ -269,7 +269,7 @@ ${CONTEXT_PLACEHOLDER}
 
 Analyze the context above and output ONLY valid JSON.
 EOFPROMPT
-)
+          )
           
           # Replace placeholder with actual context (handle special characters)
           PROMPT=$(echo "$PROMPT" | sed "s|\${CONTEXT_PLACEHOLDER}|$CONTEXT_INFO|g")
