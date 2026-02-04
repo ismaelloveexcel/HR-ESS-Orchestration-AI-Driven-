@@ -138,7 +138,7 @@ Logs Results & Metrics
 ### 📚 Documentation
 - [AI Supervisor Upgrade Summary](./AI-SUPERVISOR-UPGRADE-SUMMARY.md) - Full feature list
 - [Deployment Success Guide](./DEPLOYMENT-SUCCESS.md) - Setup and usage
-- [Workflow Enhancements](../.github/workflows/AI-CONTROLLER-ENHANCEMENTS.md) - Technical details
+- [Workflow Enhancements](.github/workflows/AI-CONTROLLER-ENHANCEMENTS.md) - Technical details
 
 ---
 

@@ -30,8 +30,8 @@
 |----------|---------|--------------|
 | **[AI-SUPERVISOR-UPGRADE-SUMMARY.md](./AI-SUPERVISOR-UPGRADE-SUMMARY.md)** | Complete feature list and technical details | You want to understand the AI supervisor capabilities |
 | **[DEPLOYMENT-SUCCESS.md](./DEPLOYMENT-SUCCESS.md)** | Setup, configuration, and usage guide | You want to configure or test the AI supervisor |
-| **[.github/workflows/README.md](./.github/workflows/README.md)** | Workflows overview | You want to understand the GitHub Actions workflows |
-| **[.github/workflows/AI-CONTROLLER-ENHANCEMENTS.md](./.github/workflows/AI-CONTROLLER-ENHANCEMENTS.md)** | Detailed technical enhancements | You want deep technical details about the supervisor |
+| **[.github/workflows/README.md](.github/workflows/README.md)** | Workflows overview | You want to understand the GitHub Actions workflows |
+| **[.github/workflows/AI-CONTROLLER-ENHANCEMENTS.md](.github/workflows/AI-CONTROLLER-ENHANCEMENTS.md)** | Detailed technical enhancements | You want deep technical details about the supervisor |
 
 ---
 
@@ -50,7 +50,7 @@
 ### "I want to understand the AI supervisor"
 1. Read [AI-SUPERVISOR-UPGRADE-SUMMARY.md](./AI-SUPERVISOR-UPGRADE-SUMMARY.md) → Overview
 2. Review [DEPLOYMENT-SUCCESS.md](./DEPLOYMENT-SUCCESS.md) → Setup
-3. Check [.github/workflows/AI-CONTROLLER-ENHANCEMENTS.md](./.github/workflows/AI-CONTROLLER-ENHANCEMENTS.md) → Technical details
+3. Check [.github/workflows/AI-CONTROLLER-ENHANCEMENTS.md](.github/workflows/AI-CONTROLLER-ENHANCEMENTS.md) → Technical details
 
 ### "I want to test the AI supervisor"
 1. Follow [GETTING-STARTED.md](./GETTING-STARTED.md) → "Testing the AI Supervisor"
