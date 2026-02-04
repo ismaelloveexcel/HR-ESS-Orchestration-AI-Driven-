@@ -1,0 +1,21 @@
+name: Agent - POC Developer 💻
+
+on:
+  push:
+    paths:
+      - 'tasks/03_architecture.md'
+      - 'tasks/04_poc_plan.md'
+  workflow_dispatch:
+
+jobs:
+  poc:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      
+      - name: Create PoC issue
+        uses: peter-evans/create-issue-from-file@v5
+        with:
+          title: '🚀 PoC: Implementation Plan'
+          content-filepath: 'tasks/04_poc_plan.md'
+          labels: 'agent,poc'
