@@ -8,17 +8,10 @@ on:
   pull_request:
     types: [opened, edited, labeled, closed, reopened, synchronize, review_requested]
   # 3. MONITOR WORKFLOW SUCCESS/FAILURE
-  # NOTE: Disabled until agent workflows are created to prevent workflow failures.
-  # These workflows don't exist yet, which was causing the AI controller to fail on every run.
-  # See CURRENT-STATE.md for details on what's missing and why.
-  # Uncomment when you add:
-  # - Deploy to Azure workflow (.github/workflows/deploy-azure.yml)
-  # - Agent - Research Specialist workflow (.github/workflows/agent-research.yml)
-  # - Agent - Blueprint Architect workflow (.github/workflows/agent-blueprint.yml)
-  # - Agent - POC Developer workflow (.github/workflows/agent-poc.yml)
-  # workflow_run:
-  #   workflows: ["Deploy to Azure 🚀", "Agent - Research Specialist 🕵️", "Agent - Blueprint Architect 🏗️", "Agent - POC Developer 💻"]
-  #   types: [completed, requested, in_progress]
+  # Agent workflows are now deployed and can be monitored
+  workflow_run:
+    workflows: ["Agent - Research Specialist 🕵️", "Agent - Blueprint Architect 🏗️", "Agent - POC Developer 💻"]
+    types: [completed, requested, in_progress]
   # 4. PERIODIC HEALTH CHECKS (Runs every 4 hours instead of 6 for more frequent monitoring)
   schedule:
     - cron: '0 */4 * * *'
