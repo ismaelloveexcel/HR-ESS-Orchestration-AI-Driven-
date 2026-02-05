@@ -13,6 +13,7 @@ import leaveRouter from './leave';
 import requestsRouter from './requests';
 import policiesRouter from './policies';
 import calendarRouter from './calendar';
+import passRouter from './pass';
 import { db } from '../database';
 
 export const apiRouter = Router();
@@ -106,6 +107,22 @@ apiRouter.get('/', (req: Request, res: Response) => {
           { method: 'POST', path: '/announcements', description: 'Create announcement', auth: true, roles: ['admin', 'hr_manager'] },
           { method: 'GET', path: '/today', description: 'Today\'s summary', auth: true }
         ]
+      },
+      pass: {
+        base: '/api/pass',
+        description: 'Universal Pass System - One layout, three modes',
+        routes: [
+          { method: 'GET', path: '/my', description: 'Get current user\'s pass', auth: true },
+          { method: 'GET', path: '/:id', description: 'Get pass by ID', auth: true },
+          { method: 'GET', path: '/:id/qr', description: 'Get QR code for pass', auth: true },
+          { method: 'GET', path: '/:id/profile', description: 'Get full profile (QR destination)', auth: true },
+          { method: 'GET', path: '/:id/wallet', description: 'Generate wallet file', auth: true },
+          { method: 'POST', path: '/candidate', description: 'Create candidate pass', auth: true, roles: ['admin', 'hr_manager'] },
+          { method: 'PATCH', path: '/:id/stage', description: 'Update pass stage', auth: true, roles: ['admin', 'hr_manager', 'manager'] },
+          { method: 'POST', path: '/:id/evaluation', description: 'Add evaluation', auth: true, roles: ['admin', 'hr_manager', 'manager'] },
+          { method: 'GET', path: '/candidates/list', description: 'List all candidate passes', auth: true, roles: ['admin', 'hr_manager', 'manager'] },
+          { method: 'GET', path: '/types/config', description: 'Get pass type configurations' }
+        ]
       }
     },
     uaeCompliance: {
@@ -127,6 +144,7 @@ apiRouter.use('/leave', leaveRouter);
 apiRouter.use('/requests', requestsRouter);
 apiRouter.use('/policies', policiesRouter);
 apiRouter.use('/calendar', calendarRouter);
+apiRouter.use('/pass', passRouter);
 
 // API health check
 apiRouter.get('/health', (req: Request, res: Response) => {
