@@ -1,6 +1,6 @@
 {
   "name": "hr-ess-orchestration",
-  "version": "1.0.0",
+  "version": "0.9.0",
   "description": "AI-powered HR Employee Self-Service system for UAE multi-entity contexts",
   "main": "dist/index.js",
   "scripts": {

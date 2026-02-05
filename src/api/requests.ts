@@ -209,6 +209,11 @@ router.get('/reference/:refNumber', authenticate, (req: AuthenticatedRequest, re
       return res.status(404).json({ error: 'Request not found' });
     }
 
+    // Access control - employees can only view their own requests
+    if (req.user?.role === 'employee' && request.employeeId !== req.user.employeeId) {
+      return res.status(403).json({ error: 'Access denied' });
+    }
+
     res.json(request);
 
   } catch (error) {

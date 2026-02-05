@@ -13,7 +13,6 @@ const router = Router();
 
 // UAE standard working hours
 const STANDARD_HOURS = 8;
-const RAMADAN_HOURS = 6;
 const OVERTIME_MULTIPLIER_NORMAL = 1.25;
 const OVERTIME_MULTIPLIER_FRIDAY = 1.5;
 const GRACE_PERIOD_MINUTES = 15;
@@ -138,7 +137,7 @@ router.post('/quick', authenticate, (req: AuthenticatedRequest, res: Response) =
       const regularHours = Math.min(totalHours, STANDARD_HOURS);
       const overtimeHours = Math.max(0, totalHours - STANDARD_HOURS);
 
-      const updated = db.updateAttendance(existingRecord.id, {
+      db.updateAttendance(existingRecord.id, {
         clockOut: now.toISOString(),
         clockOutLocation: gpsLocation,
         totalHours: Math.round(totalHours * 100) / 100,

@@ -116,7 +116,6 @@ router.get('/upcoming', authenticate, (req: AuthenticatedRequest, res: Response)
     // Also get birthdays and work anniversaries from employees
     const employees = db.getEmployees(entityCode).filter(e => e.isActive);
     const currentMonth = today.getMonth() + 1;
-    const currentDay = today.getDate();
 
     // Find birthdays this month (would need birthDate field in employee)
     // For now, use joinDate for work anniversaries
