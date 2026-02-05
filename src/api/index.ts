@@ -14,6 +14,7 @@ import requestsRouter from './requests';
 import policiesRouter from './policies';
 import calendarRouter from './calendar';
 import passRouter from './pass';
+import businesscardRouter from './businesscard';
 import { db } from '../database';
 
 export const apiRouter = Router();
@@ -110,7 +111,7 @@ apiRouter.get('/', (req: Request, res: Response) => {
       },
       pass: {
         base: '/api/pass',
-        description: 'Universal Pass System - One layout, three modes',
+        description: 'Universal Pass System - One layout, three modes (PWA enabled)',
         routes: [
           { method: 'GET', path: '/my', description: 'Get current user\'s pass', auth: true },
           { method: 'GET', path: '/:id', description: 'Get pass by ID', auth: true },
@@ -122,6 +123,21 @@ apiRouter.get('/', (req: Request, res: Response) => {
           { method: 'POST', path: '/:id/evaluation', description: 'Add evaluation', auth: true, roles: ['admin', 'hr_manager', 'manager'] },
           { method: 'GET', path: '/candidates/list', description: 'List all candidate passes', auth: true, roles: ['admin', 'hr_manager', 'manager'] },
           { method: 'GET', path: '/types/config', description: 'Get pass type configurations' }
+        ]
+      },
+      businesscard: {
+        base: '/api/businesscard',
+        description: 'Digital Business Card - QR code, vCard export, admin-controlled visibility',
+        routes: [
+          { method: 'GET', path: '/my', description: 'Get your business card', auth: true },
+          { method: 'GET', path: '/my/vcard', description: 'Download your vCard file', auth: true },
+          { method: 'GET', path: '/my/qr', description: 'Get QR code for your contact', auth: true },
+          { method: 'GET', path: '/:employeeId', description: 'Get employee business card', auth: true },
+          { method: 'GET', path: '/:employeeId/vcard', description: 'Download employee vCard', auth: true },
+          { method: 'PATCH', path: '/:employeeId/visibility', description: 'Update visibility settings', auth: true },
+          { method: 'PATCH', path: '/:employeeId', description: 'Update business card', auth: true, roles: ['admin', 'hr_manager'] },
+          { method: 'GET', path: '/settings/:entityCode', description: 'Get entity card settings', auth: true, roles: ['admin', 'hr_manager'] },
+          { method: 'PATCH', path: '/settings/:entityCode', description: 'Update entity settings', auth: true, roles: ['admin'] }
         ]
       }
     },
@@ -145,6 +161,7 @@ apiRouter.use('/requests', requestsRouter);
 apiRouter.use('/policies', policiesRouter);
 apiRouter.use('/calendar', calendarRouter);
 apiRouter.use('/pass', passRouter);
+apiRouter.use('/businesscard', businesscardRouter);
 
 // API health check
 apiRouter.get('/health', (req: Request, res: Response) => {
