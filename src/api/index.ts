@@ -15,6 +15,7 @@ import policiesRouter from './policies';
 import calendarRouter from './calendar';
 import passRouter from './pass';
 import businesscardRouter from './businesscard';
+import portalRouter from './portal';
 import { db } from '../database';
 
 export const apiRouter = Router();
@@ -141,6 +142,17 @@ apiRouter.get('/', (req: Request, res: Response) => {
           { method: 'GET', path: '/settings/:entityCode', description: 'Get entity card settings', auth: true, roles: ['admin', 'hr_manager'] },
           { method: 'PATCH', path: '/settings/:entityCode', description: 'Update entity settings', auth: true, roles: ['admin'] }
         ]
+      },
+      portal: {
+        base: '/api/portal',
+        description: 'Mini Portal - Quick Links, Check Status, View Profile (opens separately from wallet)',
+        routes: [
+          { method: 'GET', path: '/home', description: '⭐ Complete portal data in one call', auth: true },
+          { method: 'GET', path: '/quick-links', description: 'Get available quick action links', auth: true },
+          { method: 'GET', path: '/check-status/:reference', description: '🔍 Check request status by reference number' },
+          { method: 'POST', path: '/check-status', description: 'Check status via form POST' },
+          { method: 'GET', path: '/profile', description: 'View full employee profile', auth: true }
+        ]
       }
     },
     uaeCompliance: {
@@ -164,6 +176,7 @@ apiRouter.use('/policies', policiesRouter);
 apiRouter.use('/calendar', calendarRouter);
 apiRouter.use('/pass', passRouter);
 apiRouter.use('/businesscard', businesscardRouter);
+apiRouter.use('/portal', portalRouter);
 
 // API health check
 apiRouter.get('/health', (req: Request, res: Response) => {
