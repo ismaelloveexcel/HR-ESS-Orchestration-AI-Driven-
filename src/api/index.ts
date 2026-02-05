@@ -55,8 +55,10 @@ apiRouter.get('/', (req: Request, res: Response) => {
       attendance: {
         base: '/api/attendance',
         routes: [
-          { method: 'POST', path: '/clock-in', description: 'Clock in with GPS', auth: true },
-          { method: 'POST', path: '/clock-out', description: 'Clock out', auth: true },
+          { method: 'POST', path: '/quick', description: '⭐ ONE-TAP clock in/out (auto-detects)', auth: true },
+          { method: 'GET', path: '/status', description: 'Get button state (what to show)', auth: true },
+          { method: 'POST', path: '/clock-in', description: 'Manual clock in with GPS', auth: true },
+          { method: 'POST', path: '/clock-out', description: 'Manual clock out', auth: true },
           { method: 'GET', path: '/today', description: 'Get today\'s record', auth: true },
           { method: 'GET', path: '/employee/:id', description: 'Get employee attendance', auth: true },
           { method: 'GET', path: '/report/:year/:month', description: 'Monthly report', auth: true, roles: ['admin', 'hr_manager', 'manager'] },

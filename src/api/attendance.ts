@@ -61,6 +61,191 @@ const OFFICE_LOCATIONS: { [key: string]: GeolocationData[] } = {
 };
 
 /**
+ * @route POST /api/attendance/quick
+ * @desc ONE-TAP clock in/out - Auto-detects what's needed
+ * @access Private
+ * 
+ * This is the simplified endpoint for employees.
+ * Just tap once - the system figures out the rest.
+ */
+router.post('/quick', authenticate, (req: AuthenticatedRequest, res: Response) => {
+  try {
+    const { location } = req.body;
+
+    const employeeId = req.user?.employeeId;
+    if (!employeeId) {
+      return res.status(400).json({ 
+        error: 'Bad Request',
+        message: 'No employee profile linked' 
+      });
+    }
+
+    const employee = db.getEmployeeById(employeeId);
+    if (!employee) {
+      return res.status(404).json({ error: 'Employee not found' });
+    }
+
+    const today = new Date().toISOString().split('T')[0];
+    const now = new Date();
+    const existingRecord = db.getAttendanceByDate(employeeId, today);
+
+    // Prepare GPS data
+    let gpsLocation: GeolocationData | undefined;
+    if (location?.latitude && location?.longitude) {
+      gpsLocation = {
+        latitude: location.latitude,
+        longitude: location.longitude,
+        accuracy: location.accuracy,
+        address: location.address
+      };
+    }
+
+    // AUTO-DETECT: Clock in or Clock out?
+    if (!existingRecord) {
+      // ===== CLOCK IN =====
+      const shiftStart = new Date(now);
+      shiftStart.setHours(9, 0, 0, 0);
+      const graceEnd = new Date(shiftStart.getTime() + GRACE_PERIOD_MINUTES * 60000);
+      const isLate = now > graceEnd;
+
+      const record = db.createAttendance({
+        employeeId,
+        entityCode: employee.entityCode,
+        date: today,
+        clockIn: now.toISOString(),
+        clockInLocation: gpsLocation,
+        workLocation: 'office',
+        status: isLate ? 'late' : 'present'
+      });
+
+      return res.status(201).json({
+        action: 'CLOCK_IN',
+        success: true,
+        message: isLate ? `Clocked in (${Math.round((now.getTime() - graceEnd.getTime()) / 60000)} min late)` : 'Clocked in successfully! ✅',
+        time: now.toLocaleTimeString('en-AE', { hour: '2-digit', minute: '2-digit' }),
+        isLate,
+        record: {
+          id: record.id,
+          clockIn: record.clockIn,
+          status: record.status
+        }
+      });
+
+    } else if (!existingRecord.clockOut) {
+      // ===== CLOCK OUT =====
+      const clockInTime = new Date(existingRecord.clockIn!);
+      const totalHours = (now.getTime() - clockInTime.getTime()) / (1000 * 60 * 60);
+      const regularHours = Math.min(totalHours, STANDARD_HOURS);
+      const overtimeHours = Math.max(0, totalHours - STANDARD_HOURS);
+
+      const updated = db.updateAttendance(existingRecord.id, {
+        clockOut: now.toISOString(),
+        clockOutLocation: gpsLocation,
+        totalHours: Math.round(totalHours * 100) / 100,
+        regularHours: Math.round(regularHours * 100) / 100,
+        overtimeHours: Math.round(overtimeHours * 100) / 100,
+        overtimeType: overtimeHours > 0 ? 'offset' : undefined
+      });
+
+      // Format hours nicely
+      const hours = Math.floor(totalHours);
+      const minutes = Math.round((totalHours - hours) * 60);
+
+      return res.json({
+        action: 'CLOCK_OUT',
+        success: true,
+        message: `Clocked out! Worked ${hours}h ${minutes}m today 🎉`,
+        time: now.toLocaleTimeString('en-AE', { hour: '2-digit', minute: '2-digit' }),
+        summary: {
+          clockIn: existingRecord.clockIn,
+          clockOut: now.toISOString(),
+          totalHours: `${hours}h ${minutes}m`,
+          overtime: overtimeHours > 0 ? `${Math.round(overtimeHours * 60)}m overtime` : null
+        }
+      });
+
+    } else {
+      // ===== ALREADY DONE FOR TODAY =====
+      const clockIn = new Date(existingRecord.clockIn!);
+      const clockOut = new Date(existingRecord.clockOut!);
+      
+      return res.json({
+        action: 'ALREADY_COMPLETE',
+        success: true,
+        message: 'Already clocked in and out today! 👍',
+        summary: {
+          clockIn: clockIn.toLocaleTimeString('en-AE', { hour: '2-digit', minute: '2-digit' }),
+          clockOut: clockOut.toLocaleTimeString('en-AE', { hour: '2-digit', minute: '2-digit' }),
+          totalHours: existingRecord.totalHours
+        }
+      });
+    }
+
+  } catch (error) {
+    console.error('Quick clock error:', error);
+    res.status(500).json({ error: 'Failed to process clock action' });
+  }
+});
+
+/**
+ * @route GET /api/attendance/status
+ * @desc Get current clock status for the button
+ * @access Private
+ */
+router.get('/status', authenticate, (req: AuthenticatedRequest, res: Response) => {
+  try {
+    const employeeId = req.user?.employeeId;
+    if (!employeeId) {
+      return res.status(400).json({ error: 'No employee profile linked' });
+    }
+
+    const today = new Date().toISOString().split('T')[0];
+    const record = db.getAttendanceByDate(employeeId, today);
+    const now = new Date();
+
+    if (!record) {
+      return res.json({
+        status: 'NOT_CLOCKED_IN',
+        buttonText: '🕐 Clock In',
+        buttonColor: 'green',
+        canTap: true,
+        message: 'Tap to start your day'
+      });
+    }
+
+    if (!record.clockOut) {
+      const clockIn = new Date(record.clockIn!);
+      const hoursWorked = (now.getTime() - clockIn.getTime()) / (1000 * 60 * 60);
+      const hours = Math.floor(hoursWorked);
+      const minutes = Math.round((hoursWorked - hours) * 60);
+
+      return res.json({
+        status: 'CLOCKED_IN',
+        buttonText: '🏠 Clock Out',
+        buttonColor: 'blue',
+        canTap: true,
+        message: `Working for ${hours}h ${minutes}m`,
+        clockInTime: clockIn.toLocaleTimeString('en-AE', { hour: '2-digit', minute: '2-digit' })
+      });
+    }
+
+    return res.json({
+      status: 'COMPLETE',
+      buttonText: '✅ Done for Today',
+      buttonColor: 'gray',
+      canTap: false,
+      message: `Worked ${record.totalHours?.toFixed(1) || '8'}h today`,
+      clockInTime: new Date(record.clockIn!).toLocaleTimeString('en-AE', { hour: '2-digit', minute: '2-digit' }),
+      clockOutTime: new Date(record.clockOut!).toLocaleTimeString('en-AE', { hour: '2-digit', minute: '2-digit' })
+    });
+
+  } catch (error) {
+    console.error('Get status error:', error);
+    res.status(500).json({ error: 'Failed to get clock status' });
+  }
+});
+
+/**
  * @route POST /api/attendance/clock-in
  * @desc Clock in for the day
  * @access Private
