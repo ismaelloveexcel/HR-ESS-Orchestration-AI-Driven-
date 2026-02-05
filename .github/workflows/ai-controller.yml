@@ -467,14 +467,49 @@ EOFFALLBACK
                 esac
                 
                 if [ -n "$WORKFLOW_FILE" ]; then
-                  # Trigger workflow dispatch
+                  # Prepare task description from issue or body
+                  TASK_DESC=""
+                  ISSUE_NUM=""
+                  
+                  if [ "${{ github.event.issue.number }}" != "" ]; then
+                    ISSUE_NUM="${{ github.event.issue.number }}"
+                    # Use issue title + body as task description
+                    ISSUE_TITLE="${{ github.event.issue.title }}"
+                    TASK_DESC="$ISSUE_TITLE"
+                  elif [ -n "$BODY" ]; then
+                    TASK_DESC="$BODY"
+                  else
+                    TASK_DESC="$TITLE"
+                  fi
+                  
+                  # Escape special characters for JSON
+                  TASK_DESC_ESCAPED=$(echo "$TASK_DESC" | jq -Rs . | sed 's/^"//;s/"$//')
+                  
+                  # Build inputs JSON based on agent type
+                  INPUTS_JSON=""
+                  case $AGENT in
+                    RESEARCH_AGENT)
+                      INPUTS_JSON="{\"task_description\":\"$TASK_DESC_ESCAPED\",\"issue_number\":\"$ISSUE_NUM\",\"output_format\":\"both\"}"
+                      ;;
+                    BLUEPRINT_AGENT)
+                      INPUTS_JSON="{\"task_description\":\"$TASK_DESC_ESCAPED\",\"issue_number\":\"$ISSUE_NUM\",\"diagram_style\":\"both\"}"
+                      ;;
+                    POC_AGENT)
+                      INPUTS_JSON="{\"task_description\":\"$TASK_DESC_ESCAPED\",\"issue_number\":\"$ISSUE_NUM\",\"target_directory\":\"app\"}"
+                      ;;
+                  esac
+                  
+                  # Trigger workflow dispatch with inputs
+                  DISPATCH_PAYLOAD="{\"ref\":\"main\",\"inputs\":$INPUTS_JSON}"
+                  echo "📤 Dispatching with payload: $DISPATCH_PAYLOAD"
+                  
                   github_api_call POST "/repos/$REPO/actions/workflows/$WORKFLOW_FILE/dispatches" \
-                    "{\"ref\":\"main\",\"inputs\":{}}" || echo "⚠️ Failed to trigger $AGENT"
+                    "$DISPATCH_PAYLOAD" || echo "⚠️ Failed to trigger $AGENT"
                   
                   # Comment on related issue if exists
                   if [ "${{ github.event.issue.number }}" != "" ]; then
                     github_api_call POST "/repos/$REPO/issues/${{ github.event.issue.number }}/comments" \
-                      "{\"body\":\"🤖 **AI-DAN**: Assigned to **$AGENT** for execution\\n\\n**Urgency:** $URGENCY\\n**Reason:** $REASON\"}"
+                      "{\"body\":\"🤖 **AI-DAN**: Assigned to **$AGENT** for execution\\n\\n**Urgency:** $URGENCY\\n**Reason:** $REASON\\n\\n**Task:** $TASK_DESC_ESCAPED\\n\\n⏳ The agent will post results here when complete.\"}"
                   fi
                 else
                   echo "⚠️ Unknown agent: $AGENT"

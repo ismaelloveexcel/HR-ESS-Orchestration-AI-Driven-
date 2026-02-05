@@ -188,6 +188,27 @@ Critical failures automatically create alert issues with full diagnostic informa
 4. **Update Agent Mappings**: Keep agent workflow filenames in sync
 5. **Test Manually**: Use workflow_dispatch to test specific scenarios
 
+## ✅ Implemented Enhancements (v2.1)
+
+### AI-Powered Agent Workflows
+All three specialist agents now use GPT-4 Turbo for autonomous task execution:
+
+- **Research Agent 🕵️**: Performs AI-driven research and generates comprehensive reports
+- **Blueprint Agent 🏗️**: Creates architecture designs with Mermaid diagrams
+- **POC Agent 💻**: Generates production-quality TypeScript code
+
+### Agent Features
+- Auto-commit and push results to repository
+- Post status updates to related issues
+- Structured outputs (Markdown + JSON)
+- Error handling with fallback responses
+- Retry logic for network operations
+
+### Enhanced AI-DAN Integration
+- Passes task context and issue numbers to agents
+- Agents receive full issue details for context-aware execution
+- Results linked back to originating issues
+
 ## Future Enhancements
 
 - [ ] Multi-model support with cost optimization (GPT-3.5 for simple tasks)

@@ -75,19 +75,49 @@ Handles application deployment to Azure Web Apps.
 
 ---
 
-## Agent Workflows
+## Agent Workflows (AI-Powered)
+
+All agent workflows are now enhanced with AI capabilities using GPT-4 Turbo.
 
 ### Research Agent (`agent-research.yml`)
-- **Trigger**: Changes to `tasks/01_research_modules.md` or manual
-- **Purpose**: Information gathering, tool evaluation, documentation
+- **Trigger**: Changes to `tasks/01_research_modules.md`, manual, or dispatched by AI-DAN
+- **Purpose**: AI-powered research, analysis, and documentation
+- **Outputs**: 
+  - Markdown reports in `/reports/`
+  - JSON data in `/data/output/`
+- **Inputs**:
+  - `task_description`: Research task to perform
+  - `issue_number`: Related issue for status updates
+  - `output_format`: markdown, json, or both
 
 ### Blueprint Agent (`agent-blueprint.yml`)
-- **Trigger**: Changes to `tasks/02_integration_blueprint.md` or manual
-- **Purpose**: Architecture design, system diagrams, technical planning
+- **Trigger**: Changes to `tasks/02_integration_blueprint.md`, manual, or dispatched by AI-DAN
+- **Purpose**: AI-powered architecture design with Mermaid diagrams
+- **Outputs**:
+  - Architecture documents in `/blueprints/`
+  - JSON data in `/data/output/`
+- **Inputs**:
+  - `task_description`: Design task to perform
+  - `issue_number`: Related issue for status updates
+  - `diagram_style`: mermaid, ascii, or both
 
 ### POC Agent (`agent-poc.yml`)
-- **Trigger**: Changes to `tasks/04_poc_plan.md` or manual
-- **Purpose**: Code implementation, feature development, bug fixes
+- **Trigger**: Changes to `tasks/04_poc_plan.md`, manual, or dispatched by AI-DAN
+- **Purpose**: AI-powered code generation and implementation
+- **Outputs**:
+  - Generated code in `/app/poc-{timestamp}/`
+  - JSON data in `/data/output/`
+- **Inputs**:
+  - `task_description`: Feature/code to build
+  - `issue_number`: Related issue for status updates
+  - `target_directory`: app, src, or poc
+
+### Agent Workflow Features
+- **Auto-commit**: Results are automatically committed and pushed
+- **Issue Updates**: Agents post status updates to related issues
+- **Structured Output**: All agents produce both human-readable and machine-readable outputs
+- **Error Handling**: Fallback responses when AI is unavailable
+- **Retry Logic**: Push operations retry with exponential backoff
 
 ---
 

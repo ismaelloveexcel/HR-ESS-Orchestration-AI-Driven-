@@ -5,19 +5,330 @@ on:
     paths:
       - 'tasks/01_research_modules.md'
   workflow_dispatch:
+    inputs:
+      task_description:
+        description: 'Research task to perform'
+        required: true
+        default: 'Research HR ESS modules and best practices'
+        type: string
+      issue_number:
+        description: 'Related issue number (for status updates)'
+        required: false
+        default: ''
+        type: string
+      output_format:
+        description: 'Output format for the report'
+        required: false
+        default: 'markdown'
+        type: choice
+        options:
+          - markdown
+          - json
+          - both
+
+env:
+  REPORT_DIR: reports
+  DATA_DIR: data/output
 
 jobs:
   research:
+    name: 🕵️ Execute Research Task
     runs-on: ubuntu-latest
+    timeout-minutes: 10
     permissions:
-      contents: read
+      contents: write
       issues: write
+      pull-requests: write
+    
     steps:
-      - uses: actions/checkout@v4
-      
-      - name: Create research issue
-        uses: peter-evans/create-issue-from-file@v5
+      - name: Checkout repository
+        uses: actions/checkout@v4
         with:
-          title: '🤖 Research: HR Modules'
-          content-filepath: 'tasks/01_research_modules.md'
-          labels: 'agent,research'
+          token: ${{ secrets.GITHUB_TOKEN }}
+          fetch-depth: 0
+
+      - name: Setup environment
+        run: |
+          sudo apt-get update -qq
+          sudo apt-get install -y jq curl
+          mkdir -p ${{ env.REPORT_DIR }} ${{ env.DATA_DIR }}
+          echo "✅ Environment ready"
+
+      - name: Determine task context
+        id: context
+        run: |
+          # Determine if triggered manually or by file change
+          if [ "${{ github.event_name }}" = "workflow_dispatch" ]; then
+            TASK="${{ github.event.inputs.task_description }}"
+            ISSUE_NUM="${{ github.event.inputs.issue_number }}"
+            OUTPUT_FORMAT="${{ github.event.inputs.output_format }}"
+          else
+            # Read from task file for push triggers
+            TASK=$(cat tasks/01_research_modules.md | head -100)
+            ISSUE_NUM=""
+            OUTPUT_FORMAT="both"
+          fi
+          
+          # Generate unique filename based on timestamp
+          TIMESTAMP=$(date +%Y%m%d-%H%M%S)
+          REPORT_FILE="research-${TIMESTAMP}.md"
+          DATA_FILE="research-${TIMESTAMP}.json"
+          
+          echo "task<<EOF" >> $GITHUB_OUTPUT
+          echo "$TASK" >> $GITHUB_OUTPUT
+          echo "EOF" >> $GITHUB_OUTPUT
+          echo "issue_num=$ISSUE_NUM" >> $GITHUB_OUTPUT
+          echo "output_format=$OUTPUT_FORMAT" >> $GITHUB_OUTPUT
+          echo "report_file=$REPORT_FILE" >> $GITHUB_OUTPUT
+          echo "data_file=$DATA_FILE" >> $GITHUB_OUTPUT
+          echo "timestamp=$TIMESTAMP" >> $GITHUB_OUTPUT
+          
+          echo "📋 Task: $TASK"
+          echo "📁 Report: $REPORT_FILE"
+
+      - name: Execute AI Research
+        id: research
+        env:
+          OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
+        run: |
+          echo "🔍 Starting AI-powered research..."
+          
+          TASK="${{ steps.context.outputs.task }}"
+          
+          # Build the research prompt
+          PROMPT=$(cat <<'EOFPROMPT'
+You are a senior technical researcher specializing in HR systems and UAE labor compliance.
+
+**RESEARCH TASK:**
+${TASK_PLACEHOLDER}
+
+**INSTRUCTIONS:**
+1. Provide comprehensive research findings
+2. Include specific recommendations
+3. Cite sources or reasoning
+4. Focus on UAE multi-entity context
+5. Consider open-source solutions when applicable
+
+**OUTPUT FORMAT:**
+Structure your response as a detailed research report with:
+- Executive Summary (2-3 sentences)
+- Key Findings (bulleted list)
+- Detailed Analysis (organized sections)
+- Recommendations (prioritized list)
+- Next Steps (actionable items)
+- References/Sources (if applicable)
+
+Be thorough, practical, and specific to the HR ESS domain.
+EOFPROMPT
+          )
+          
+          # Replace placeholder with actual task
+          PROMPT=$(echo "$PROMPT" | sed "s|\${TASK_PLACEHOLDER}|$TASK|g")
+          
+          # Call OpenAI API
+          RESPONSE=$(curl -s --max-time 60 https://api.openai.com/v1/chat/completions \
+            -H "Authorization: Bearer $OPENAI_API_KEY" \
+            -H "Content-Type: application/json" \
+            -d @- <<EOFCURL
+{
+  "model": "gpt-4-turbo-preview",
+  "messages": [
+    {
+      "role": "system",
+      "content": "You are a technical research specialist for HR systems. Provide detailed, actionable research reports."
+    },
+    {
+      "role": "user",
+      "content": $(echo "$PROMPT" | jq -Rs .)
+    }
+  ],
+  "temperature": 0.3,
+  "max_tokens": 4000
+}
+EOFCURL
+          2>&1)
+          
+          # Extract the research content
+          RESEARCH_CONTENT=$(echo "$RESPONSE" | jq -r '.choices[0].message.content // "Research failed - no content returned"')
+          
+          if [ "$RESEARCH_CONTENT" = "null" ] || [ -z "$RESEARCH_CONTENT" ]; then
+            echo "⚠️ AI API returned no content, using fallback"
+            RESEARCH_CONTENT="## Research Report\n\n**Task:** $TASK\n\n**Status:** AI research could not be completed. Please check API configuration.\n\n**Recommendation:** Review OPENAI_API_KEY secret and retry."
+          fi
+          
+          # Save research content for next step
+          echo "$RESEARCH_CONTENT" > /tmp/research_content.md
+          echo "✅ Research completed"
+
+      - name: Generate Markdown Report
+        if: contains(steps.context.outputs.output_format, 'markdown') || contains(steps.context.outputs.output_format, 'both')
+        run: |
+          REPORT_FILE="${{ env.REPORT_DIR }}/${{ steps.context.outputs.report_file }}"
+          TASK="${{ steps.context.outputs.task }}"
+          TIMESTAMP="${{ steps.context.outputs.timestamp }}"
+          
+          # Create the markdown report with metadata
+          cat > "$REPORT_FILE" <<EOFREPORT
+# 🕵️ Research Report
+
+**Generated:** $(date -u +"%Y-%m-%d %H:%M:%S UTC")  
+**Agent:** Research Specialist  
+**Run ID:** ${{ github.run_id }}  
+**Triggered By:** ${{ github.event_name }}
+
+---
+
+## 📋 Research Task
+
+> $TASK
+
+---
+
+$(cat /tmp/research_content.md)
+
+---
+
+## 📊 Metadata
+
+| Field | Value |
+|-------|-------|
+| Timestamp | $TIMESTAMP |
+| Workflow | ${{ github.workflow }} |
+| Repository | ${{ github.repository }} |
+| Branch | ${{ github.ref_name }} |
+| Actor | ${{ github.actor }} |
+
+---
+
+*This report was auto-generated by the Research Specialist Agent 🕵️*
+EOFREPORT
+
+          echo "📄 Markdown report saved to $REPORT_FILE"
+          cat "$REPORT_FILE"
+
+      - name: Generate JSON Data
+        if: contains(steps.context.outputs.output_format, 'json') || contains(steps.context.outputs.output_format, 'both')
+        run: |
+          DATA_FILE="${{ env.DATA_DIR }}/${{ steps.context.outputs.data_file }}"
+          TASK="${{ steps.context.outputs.task }}"
+          TIMESTAMP="${{ steps.context.outputs.timestamp }}"
+          RESEARCH_CONTENT=$(cat /tmp/research_content.md)
+          
+          # Create structured JSON output
+          jq -n \
+            --arg task "$TASK" \
+            --arg timestamp "$TIMESTAMP" \
+            --arg content "$RESEARCH_CONTENT" \
+            --arg run_id "${{ github.run_id }}" \
+            --arg actor "${{ github.actor }}" \
+            --arg event "${{ github.event_name }}" \
+            --arg issue "${{ steps.context.outputs.issue_num }}" \
+            '{
+              "type": "research_report",
+              "agent": "research_specialist",
+              "task": $task,
+              "timestamp": $timestamp,
+              "content": $content,
+              "metadata": {
+                "run_id": $run_id,
+                "actor": $actor,
+                "trigger": $event,
+                "related_issue": (if $issue == "" then null else $issue end)
+              },
+              "status": "completed"
+            }' > "$DATA_FILE"
+          
+          echo "📊 JSON data saved to $DATA_FILE"
+
+      - name: Commit and push results
+        run: |
+          git config user.name "Research Agent 🕵️"
+          git config user.email "research-agent@github-actions.local"
+          
+          # Add all generated files
+          git add ${{ env.REPORT_DIR }}/ ${{ env.DATA_DIR }}/ || true
+          
+          # Check if there are changes to commit
+          if git diff --staged --quiet; then
+            echo "ℹ️ No changes to commit"
+          else
+            COMMIT_MSG="🕵️ Research Report: ${{ steps.context.outputs.timestamp }}
+
+Task: ${{ steps.context.outputs.task }}
+Triggered by: ${{ github.event_name }}
+Run ID: ${{ github.run_id }}"
+            
+            git commit -m "$COMMIT_MSG"
+            
+            # Push with retry logic
+            RETRY_COUNT=0
+            MAX_RETRIES=4
+            DELAY=4
+            
+            while [ $RETRY_COUNT -lt $MAX_RETRIES ]; do
+              if git push; then
+                echo "✅ Results pushed successfully"
+                break
+              else
+                RETRY_COUNT=$((RETRY_COUNT + 1))
+                echo "⚠️ Push failed, retry $RETRY_COUNT/$MAX_RETRIES in ${DELAY}s..."
+                sleep $DELAY
+                DELAY=$((DELAY * 2))
+              fi
+            done
+            
+            if [ $RETRY_COUNT -eq $MAX_RETRIES ]; then
+              echo "❌ Failed to push after $MAX_RETRIES attempts"
+              exit 1
+            fi
+          fi
+
+      - name: Update related issue
+        if: steps.context.outputs.issue_num != ''
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          ISSUE_NUM="${{ steps.context.outputs.issue_num }}"
+          REPORT_FILE="${{ steps.context.outputs.report_file }}"
+          REPO="${{ github.repository }}"
+          
+          # Create a summary comment
+          COMMENT=$(cat <<EOFCOMMENT
+## 🕵️ Research Complete!
+
+The Research Specialist Agent has completed the analysis.
+
+### 📄 Report Location
+- **Markdown Report:** \`reports/$REPORT_FILE\`
+- **JSON Data:** \`data/output/${{ steps.context.outputs.data_file }}\`
+
+### 📋 Task Completed
+> ${{ steps.context.outputs.task }}
+
+### 🔗 Links
+- [View Workflow Run](https://github.com/$REPO/actions/runs/${{ github.run_id }})
+- [View Report](https://github.com/$REPO/blob/${{ github.ref_name }}/reports/$REPORT_FILE)
+
+---
+*Auto-generated by Research Agent 🕵️*
+EOFCOMMENT
+          )
+          
+          # Post comment to issue
+          curl -s -X POST "https://api.github.com/repos/$REPO/issues/$ISSUE_NUM/comments" \
+            -H "Authorization: Bearer $GH_TOKEN" \
+            -H "Accept: application/vnd.github.v3+json" \
+            -d "$(jq -n --arg body "$COMMENT" '{body: $body}')"
+          
+          echo "💬 Posted update to issue #$ISSUE_NUM"
+
+      - name: Summary
+        run: |
+          echo "## 🕵️ Research Agent Summary" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "| Field | Value |" >> $GITHUB_STEP_SUMMARY
+          echo "|-------|-------|" >> $GITHUB_STEP_SUMMARY
+          echo "| Task | ${{ steps.context.outputs.task }} |" >> $GITHUB_STEP_SUMMARY
+          echo "| Report | \`reports/${{ steps.context.outputs.report_file }}\` |" >> $GITHUB_STEP_SUMMARY
+          echo "| Data | \`data/output/${{ steps.context.outputs.data_file }}\` |" >> $GITHUB_STEP_SUMMARY
+          echo "| Status | ✅ Completed |" >> $GITHUB_STEP_SUMMARY

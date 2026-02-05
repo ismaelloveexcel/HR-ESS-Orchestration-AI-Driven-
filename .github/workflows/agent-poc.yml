@@ -5,19 +5,476 @@ on:
     paths:
       - 'tasks/04_poc_plan.md'
   workflow_dispatch:
+    inputs:
+      task_description:
+        description: 'Code/feature to build'
+        required: true
+        default: 'Build a proof-of-concept feature for HR ESS'
+        type: string
+      issue_number:
+        description: 'Related issue number (for status updates)'
+        required: false
+        default: ''
+        type: string
+      target_directory:
+        description: 'Target directory for generated code'
+        required: false
+        default: 'app'
+        type: choice
+        options:
+          - app
+          - src
+          - poc
+
+env:
+  APP_DIR: app
+  DATA_DIR: data/output
 
 jobs:
   poc:
+    name: 💻 Execute POC Development
     runs-on: ubuntu-latest
+    timeout-minutes: 15
     permissions:
-      contents: read
+      contents: write
       issues: write
+      pull-requests: write
+    
     steps:
-      - uses: actions/checkout@v4
-      
-      - name: Create PoC issue
-        uses: peter-evans/create-issue-from-file@v5
+      - name: Checkout repository
+        uses: actions/checkout@v4
         with:
-          title: '🚀 PoC: Implementation Plan'
-          content-filepath: 'tasks/04_poc_plan.md'
-          labels: 'agent,poc'
+          token: ${{ secrets.GITHUB_TOKEN }}
+          fetch-depth: 0
+
+      - name: Setup environment
+        run: |
+          sudo apt-get update -qq
+          sudo apt-get install -y jq curl
+          mkdir -p ${{ env.APP_DIR }} ${{ env.DATA_DIR }}
+          
+          # Setup Node.js for potential code execution
+          if command -v node &> /dev/null; then
+            echo "Node.js version: $(node --version)"
+          fi
+          
+          echo "✅ Environment ready"
+
+      - name: Determine task context
+        id: context
+        run: |
+          # Determine if triggered manually or by file change
+          if [ "${{ github.event_name }}" = "workflow_dispatch" ]; then
+            TASK="${{ github.event.inputs.task_description }}"
+            ISSUE_NUM="${{ github.event.inputs.issue_number }}"
+            TARGET_DIR="${{ github.event.inputs.target_directory }}"
+          else
+            # Read from task file for push triggers
+            TASK=$(cat tasks/04_poc_plan.md | head -100)
+            ISSUE_NUM=""
+            TARGET_DIR="app"
+          fi
+          
+          # Generate unique identifiers
+          TIMESTAMP=$(date +%Y%m%d-%H%M%S)
+          POC_ID="poc-${TIMESTAMP}"
+          DATA_FILE="${POC_ID}.json"
+          
+          echo "task<<EOF" >> $GITHUB_OUTPUT
+          echo "$TASK" >> $GITHUB_OUTPUT
+          echo "EOF" >> $GITHUB_OUTPUT
+          echo "issue_num=$ISSUE_NUM" >> $GITHUB_OUTPUT
+          echo "target_dir=$TARGET_DIR" >> $GITHUB_OUTPUT
+          echo "poc_id=$POC_ID" >> $GITHUB_OUTPUT
+          echo "data_file=$DATA_FILE" >> $GITHUB_OUTPUT
+          echo "timestamp=$TIMESTAMP" >> $GITHUB_OUTPUT
+          
+          echo "📋 Task: $TASK"
+          echo "📁 Target: $TARGET_DIR"
+
+      - name: Analyze existing codebase
+        id: analyze
+        run: |
+          echo "🔍 Analyzing existing codebase structure..."
+          
+          # Get list of existing files for context
+          EXISTING_FILES=""
+          if [ -d "src" ]; then
+            EXISTING_FILES=$(find src -name "*.ts" -o -name "*.js" | head -20 | tr '\n' ', ')
+          fi
+          
+          # Get package.json dependencies if exists
+          DEPENDENCIES=""
+          if [ -f "package.json" ]; then
+            DEPENDENCIES=$(cat package.json | jq -r '.dependencies // {} | keys | join(", ")' 2>/dev/null || echo "")
+          fi
+          
+          echo "existing_files=$EXISTING_FILES" >> $GITHUB_OUTPUT
+          echo "dependencies=$DEPENDENCIES" >> $GITHUB_OUTPUT
+          
+          echo "📦 Found dependencies: $DEPENDENCIES"
+
+      - name: Execute AI Code Generation
+        id: generate
+        env:
+          OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
+        run: |
+          echo "💻 Starting AI-powered code generation..."
+          
+          TASK="${{ steps.context.outputs.task }}"
+          TARGET_DIR="${{ steps.context.outputs.target_dir }}"
+          EXISTING_FILES="${{ steps.analyze.outputs.existing_files }}"
+          DEPENDENCIES="${{ steps.analyze.outputs.dependencies }}"
+          
+          # Build the code generation prompt
+          PROMPT=$(cat <<'EOFPROMPT'
+You are a senior full-stack developer specializing in Node.js/TypeScript and HR systems.
+
+**DEVELOPMENT TASK:**
+${TASK_PLACEHOLDER}
+
+**EXISTING CODEBASE CONTEXT:**
+- Stack: Node.js, TypeScript, Express
+- Dependencies: ${DEPS_PLACEHOLDER}
+- Existing files: ${FILES_PLACEHOLDER}
+- Target: UAE multi-entity HR ESS system
+
+**INSTRUCTIONS:**
+1. Generate production-quality TypeScript code
+2. Follow existing patterns in the codebase
+3. Include proper error handling
+4. Add JSDoc comments for documentation
+5. Include basic tests or test suggestions
+6. Make code modular and reusable
+
+**CRITICAL OUTPUT FORMAT:**
+You MUST structure your response EXACTLY as follows, using these exact markers:
+
+### FILE: path/to/file.ts
+```typescript
+// Your code here
+```
+
+### FILE: path/to/another-file.ts  
+```typescript
+// More code here
+```
+
+### SUMMARY
+Brief description of what was created and how to use it.
+
+### NEXT_STEPS
+- List of follow-up tasks
+- Integration instructions
+
+IMPORTANT: 
+- Use "### FILE:" prefix for each file (include relative path)
+- Code must be inside ```typescript or ```javascript blocks
+- Every file needs its own ### FILE: marker
+- Paths should be relative to the target directory
+EOFPROMPT
+          )
+          
+          # Replace placeholders
+          PROMPT=$(echo "$PROMPT" | sed "s|\${TASK_PLACEHOLDER}|$TASK|g")
+          PROMPT=$(echo "$PROMPT" | sed "s|\${DEPS_PLACEHOLDER}|$DEPENDENCIES|g")
+          PROMPT=$(echo "$PROMPT" | sed "s|\${FILES_PLACEHOLDER}|$EXISTING_FILES|g")
+          
+          # Call OpenAI API
+          RESPONSE=$(curl -s --max-time 120 https://api.openai.com/v1/chat/completions \
+            -H "Authorization: Bearer $OPENAI_API_KEY" \
+            -H "Content-Type: application/json" \
+            -d @- <<EOFCURL
+{
+  "model": "gpt-4-turbo-preview",
+  "messages": [
+    {
+      "role": "system",
+      "content": "You are an expert TypeScript/Node.js developer. Generate clean, well-documented, production-ready code. Always use the exact output format specified with ### FILE: markers."
+    },
+    {
+      "role": "user",
+      "content": $(echo "$PROMPT" | jq -Rs .)
+    }
+  ],
+  "temperature": 0.2,
+  "max_tokens": 4000
+}
+EOFCURL
+          2>&1)
+          
+          # Extract the generated content
+          GENERATED_CONTENT=$(echo "$RESPONSE" | jq -r '.choices[0].message.content // "Code generation failed"')
+          
+          if [ "$GENERATED_CONTENT" = "null" ] || [ -z "$GENERATED_CONTENT" ]; then
+            echo "⚠️ AI API returned no content, using fallback"
+            GENERATED_CONTENT="### SUMMARY\n\nCode generation could not be completed. Please check API configuration.\n\n### NEXT_STEPS\n- Review OPENAI_API_KEY secret\n- Retry the workflow"
+          fi
+          
+          # Save generated content
+          echo "$GENERATED_CONTENT" > /tmp/generated_content.md
+          echo "✅ Code generation completed"
+
+      - name: Parse and write generated files
+        id: write_files
+        run: |
+          TARGET_DIR="${{ steps.context.outputs.target_dir }}"
+          POC_ID="${{ steps.context.outputs.poc_id }}"
+          
+          echo "📝 Parsing generated code and writing files..."
+          
+          # Create POC subdirectory
+          POC_DIR="${TARGET_DIR}/${POC_ID}"
+          mkdir -p "$POC_DIR"
+          
+          CONTENT=$(cat /tmp/generated_content.md)
+          FILES_CREATED=""
+          
+          # Extract and write each file using ### FILE: markers
+          # This uses awk to parse the structured output
+          echo "$CONTENT" | awk -v poc_dir="$POC_DIR" '
+            BEGIN { in_file = 0; in_code = 0; filename = ""; code = "" }
+            
+            /^### FILE:/ {
+              # Save previous file if exists
+              if (filename != "" && code != "") {
+                filepath = poc_dir "/" filename
+                gsub(/^\/+/, "", filepath)  # Remove leading slashes
+                
+                # Create directory if needed
+                dir = filepath
+                gsub(/\/[^\/]+$/, "", dir)
+                system("mkdir -p \"" dir "\"")
+                
+                # Write file
+                print code > filepath
+                close(filepath)
+                print "Created: " filepath
+              }
+              
+              # Start new file
+              filename = $0
+              gsub(/^### FILE: */, "", filename)
+              gsub(/^ +| +$/, "", filename)
+              code = ""
+              in_file = 1
+              in_code = 0
+              next
+            }
+            
+            /^```(typescript|javascript|ts|js)?$/ {
+              if (in_file && !in_code) {
+                in_code = 1
+                next
+              }
+            }
+            
+            /^```$/ {
+              if (in_code) {
+                in_code = 0
+                next
+              }
+            }
+            
+            in_code {
+              code = code $0 "\n"
+            }
+            
+            END {
+              # Save last file
+              if (filename != "" && code != "") {
+                filepath = poc_dir "/" filename
+                gsub(/^\/+/, "", filepath)
+                
+                dir = filepath
+                gsub(/\/[^\/]+$/, "", dir)
+                system("mkdir -p \"" dir "\"")
+                
+                print code > filepath
+                close(filepath)
+                print "Created: " filepath
+              }
+            }
+          '
+          
+          # Also save the full response as documentation
+          cat > "${POC_DIR}/README.md" <<EOFREADME
+# 💻 POC: ${POC_ID}
+
+**Generated:** $(date -u +"%Y-%m-%d %H:%M:%S UTC")  
+**Agent:** POC Developer  
+**Run ID:** ${{ github.run_id }}
+
+## 📋 Task
+
+> ${{ steps.context.outputs.task }}
+
+---
+
+## 📁 Generated Files
+
+$(ls -la "$POC_DIR" 2>/dev/null | tail -n +2 || echo "No files generated")
+
+---
+
+## 📖 Full Generation Output
+
+$(cat /tmp/generated_content.md)
+
+---
+
+*Auto-generated by POC Developer Agent 💻*
+EOFREADME
+          
+          # Count files created
+          FILE_COUNT=$(find "$POC_DIR" -type f | wc -l)
+          echo "files_created=$FILE_COUNT" >> $GITHUB_OUTPUT
+          echo "poc_dir=$POC_DIR" >> $GITHUB_OUTPUT
+          
+          echo "✅ Created $FILE_COUNT files in $POC_DIR"
+          ls -la "$POC_DIR"
+
+      - name: Generate JSON Data
+        run: |
+          DATA_FILE="${{ env.DATA_DIR }}/${{ steps.context.outputs.data_file }}"
+          TASK="${{ steps.context.outputs.task }}"
+          TIMESTAMP="${{ steps.context.outputs.timestamp }}"
+          POC_DIR="${{ steps.write_files.outputs.poc_dir }}"
+          FILES_CREATED="${{ steps.write_files.outputs.files_created }}"
+          
+          # Get list of created files
+          FILE_LIST=$(find "$POC_DIR" -type f -name "*.ts" -o -name "*.js" -o -name "*.md" 2>/dev/null | tr '\n' ',' | sed 's/,$//')
+          
+          # Create structured JSON output
+          jq -n \
+            --arg task "$TASK" \
+            --arg timestamp "$TIMESTAMP" \
+            --arg poc_dir "$POC_DIR" \
+            --arg files_created "$FILES_CREATED" \
+            --arg file_list "$FILE_LIST" \
+            --arg run_id "${{ github.run_id }}" \
+            --arg actor "${{ github.actor }}" \
+            --arg event "${{ github.event_name }}" \
+            --arg issue "${{ steps.context.outputs.issue_num }}" \
+            '{
+              "type": "poc_implementation",
+              "agent": "poc_developer",
+              "task": $task,
+              "timestamp": $timestamp,
+              "output": {
+                "directory": $poc_dir,
+                "files_created": ($files_created | tonumber),
+                "files": ($file_list | split(","))
+              },
+              "metadata": {
+                "run_id": $run_id,
+                "actor": $actor,
+                "trigger": $event,
+                "related_issue": (if $issue == "" then null else $issue end)
+              },
+              "status": "completed"
+            }' > "$DATA_FILE"
+          
+          echo "📊 JSON data saved to $DATA_FILE"
+
+      - name: Commit and push results
+        run: |
+          git config user.name "POC Agent 💻"
+          git config user.email "poc-agent@github-actions.local"
+          
+          # Add all generated files
+          git add ${{ env.APP_DIR }}/ ${{ env.DATA_DIR }}/ || true
+          
+          # Check if there are changes to commit
+          if git diff --staged --quiet; then
+            echo "ℹ️ No changes to commit"
+          else
+            COMMIT_MSG="💻 POC Implementation: ${{ steps.context.outputs.poc_id }}
+
+Task: ${{ steps.context.outputs.task }}
+Files created: ${{ steps.write_files.outputs.files_created }}
+Triggered by: ${{ github.event_name }}
+Run ID: ${{ github.run_id }}"
+            
+            git commit -m "$COMMIT_MSG"
+            
+            # Push with retry logic
+            RETRY_COUNT=0
+            MAX_RETRIES=4
+            DELAY=4
+            
+            while [ $RETRY_COUNT -lt $MAX_RETRIES ]; do
+              if git push; then
+                echo "✅ Results pushed successfully"
+                break
+              else
+                RETRY_COUNT=$((RETRY_COUNT + 1))
+                echo "⚠️ Push failed, retry $RETRY_COUNT/$MAX_RETRIES in ${DELAY}s..."
+                sleep $DELAY
+                DELAY=$((DELAY * 2))
+              fi
+            done
+            
+            if [ $RETRY_COUNT -eq $MAX_RETRIES ]; then
+              echo "❌ Failed to push after $MAX_RETRIES attempts"
+              exit 1
+            fi
+          fi
+
+      - name: Update related issue
+        if: steps.context.outputs.issue_num != ''
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          ISSUE_NUM="${{ steps.context.outputs.issue_num }}"
+          POC_DIR="${{ steps.write_files.outputs.poc_dir }}"
+          FILES_CREATED="${{ steps.write_files.outputs.files_created }}"
+          REPO="${{ github.repository }}"
+          
+          # Create a summary comment
+          COMMENT=$(cat <<EOFCOMMENT
+## 💻 POC Implementation Complete!
+
+The POC Developer Agent has completed the implementation.
+
+### 📁 Output Location
+- **POC Directory:** \`$POC_DIR\`
+- **Files Created:** $FILES_CREATED
+- **JSON Data:** \`data/output/${{ steps.context.outputs.data_file }}\`
+
+### 📋 Task Completed
+> ${{ steps.context.outputs.task }}
+
+### 🔗 Links
+- [View Workflow Run](https://github.com/$REPO/actions/runs/${{ github.run_id }})
+- [View POC Code](https://github.com/$REPO/tree/${{ github.ref_name }}/$POC_DIR)
+
+### 📝 Next Steps
+1. Review the generated code
+2. Run tests if included
+3. Integrate with main codebase if approved
+
+---
+*Auto-generated by POC Developer 💻*
+EOFCOMMENT
+          )
+          
+          # Post comment to issue
+          curl -s -X POST "https://api.github.com/repos/$REPO/issues/$ISSUE_NUM/comments" \
+            -H "Authorization: Bearer $GH_TOKEN" \
+            -H "Accept: application/vnd.github.v3+json" \
+            -d "$(jq -n --arg body "$COMMENT" '{body: $body}')"
+          
+          echo "💬 Posted update to issue #$ISSUE_NUM"
+
+      - name: Summary
+        run: |
+          echo "## 💻 POC Developer Summary" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "| Field | Value |" >> $GITHUB_STEP_SUMMARY
+          echo "|-------|-------|" >> $GITHUB_STEP_SUMMARY
+          echo "| Task | ${{ steps.context.outputs.task }} |" >> $GITHUB_STEP_SUMMARY
+          echo "| POC Directory | \`${{ steps.write_files.outputs.poc_dir }}\` |" >> $GITHUB_STEP_SUMMARY
+          echo "| Files Created | ${{ steps.write_files.outputs.files_created }} |" >> $GITHUB_STEP_SUMMARY
+          echo "| Data | \`data/output/${{ steps.context.outputs.data_file }}\` |" >> $GITHUB_STEP_SUMMARY
+          echo "| Status | ✅ Completed |" >> $GITHUB_STEP_SUMMARY
