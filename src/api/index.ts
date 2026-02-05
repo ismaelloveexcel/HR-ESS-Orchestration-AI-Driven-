@@ -1,68 +1,140 @@
-import { Router } from 'express';
-import employeeRouter from './employees';
+/**
+ * API Router - Main Entry Point
+ * 
+ * All API routes are registered here.
+ * Base path: /api
+ */
+
+import { Router, Request, Response } from 'express';
 import authRouter from './auth';
+import employeesRouter from './employees';
 import attendanceRouter from './attendance';
 import leaveRouter from './leave';
 import requestsRouter from './requests';
-import calendarRouter from './calendar';
 import policiesRouter from './policies';
+import calendarRouter from './calendar';
+import { db } from '../database';
 
 export const apiRouter = Router();
 
-// API routes
+// API Info endpoint
+apiRouter.get('/', (req: Request, res: Response) => {
+  const entities = db.getEntities();
+  
+  res.json({
+    name: 'HR ESS API',
+    version: '1.0.0',
+    description: 'Employee Self-Service System for UAE Multi-Entity Organizations',
+    documentation: '/api/docs',
+    status: 'operational',
+    entities: entities.map(e => ({ code: e.code, name: e.name })),
+    endpoints: {
+      auth: {
+        base: '/api/auth',
+        routes: [
+          { method: 'POST', path: '/register', description: 'Register new user' },
+          { method: 'POST', path: '/login', description: 'Authenticate user' },
+          { method: 'GET', path: '/me', description: 'Get current user info', auth: true },
+          { method: 'POST', path: '/change-password', description: 'Change password', auth: true },
+          { method: 'GET', path: '/entities', description: 'Get available entities' }
+        ]
+      },
+      employees: {
+        base: '/api/employees',
+        routes: [
+          { method: 'GET', path: '/', description: 'List employees', auth: true },
+          { method: 'GET', path: '/:id', description: 'Get employee by ID', auth: true },
+          { method: 'POST', path: '/', description: 'Create employee', auth: true, roles: ['admin', 'hr_manager'] },
+          { method: 'PUT', path: '/:id', description: 'Update employee', auth: true, roles: ['admin', 'hr_manager'] },
+          { method: 'DELETE', path: '/:id', description: 'Deactivate employee', auth: true, roles: ['admin'] },
+          { method: 'GET', path: '/:id/summary', description: 'Get employee summary', auth: true }
+        ]
+      },
+      attendance: {
+        base: '/api/attendance',
+        routes: [
+          { method: 'POST', path: '/clock-in', description: 'Clock in with GPS', auth: true },
+          { method: 'POST', path: '/clock-out', description: 'Clock out', auth: true },
+          { method: 'GET', path: '/today', description: 'Get today\'s record', auth: true },
+          { method: 'GET', path: '/employee/:id', description: 'Get employee attendance', auth: true },
+          { method: 'GET', path: '/report/:year/:month', description: 'Monthly report', auth: true, roles: ['admin', 'hr_manager', 'manager'] },
+          { method: 'POST', path: '/manual', description: 'Manual entry', auth: true, roles: ['admin', 'hr_manager'] }
+        ]
+      },
+      leave: {
+        base: '/api/leave',
+        routes: [
+          { method: 'POST', path: '/request', description: 'Submit leave request', auth: true },
+          { method: 'GET', path: '/requests', description: 'List leave requests', auth: true },
+          { method: 'GET', path: '/request/:id', description: 'Get request details', auth: true },
+          { method: 'PATCH', path: '/request/:id/approve', description: 'Approve request', auth: true, roles: ['admin', 'hr_manager', 'manager'] },
+          { method: 'PATCH', path: '/request/:id/reject', description: 'Reject request', auth: true, roles: ['admin', 'hr_manager', 'manager'] },
+          { method: 'PATCH', path: '/request/:id/cancel', description: 'Cancel request', auth: true },
+          { method: 'GET', path: '/balance/:employeeId/:year', description: 'Get leave balance', auth: true },
+          { method: 'GET', path: '/calendar', description: 'Team leave calendar', auth: true }
+        ]
+      },
+      requests: {
+        base: '/api/requests',
+        routes: [
+          { method: 'POST', path: '/', description: 'Submit document request', auth: true },
+          { method: 'GET', path: '/', description: 'List requests', auth: true },
+          { method: 'GET', path: '/:id', description: 'Get request details', auth: true },
+          { method: 'PATCH', path: '/:id/process', description: 'Start processing', auth: true, roles: ['admin', 'hr_manager'] },
+          { method: 'PATCH', path: '/:id/complete', description: 'Complete request', auth: true, roles: ['admin', 'hr_manager'] },
+          { method: 'GET', path: '/types/list', description: 'Get request types' }
+        ]
+      },
+      policies: {
+        base: '/api/policies',
+        routes: [
+          { method: 'GET', path: '/', description: 'List policies', auth: true },
+          { method: 'GET', path: '/:id', description: 'Get policy details', auth: true },
+          { method: 'POST', path: '/:id/acknowledge', description: 'Acknowledge policy', auth: true },
+          { method: 'GET', path: '/pending/acknowledgments', description: 'Pending acknowledgments', auth: true },
+          { method: 'GET', path: '/:id/acknowledgments', description: 'Policy acknowledgment report', auth: true, roles: ['admin', 'hr_manager'] }
+        ]
+      },
+      calendar: {
+        base: '/api/calendar',
+        routes: [
+          { method: 'GET', path: '/events', description: 'Get calendar events', auth: true },
+          { method: 'GET', path: '/holidays', description: 'Get public holidays', auth: true },
+          { method: 'GET', path: '/upcoming', description: 'Upcoming events', auth: true },
+          { method: 'POST', path: '/events', description: 'Create event', auth: true, roles: ['admin', 'hr_manager'] },
+          { method: 'GET', path: '/announcements', description: 'Get announcements', auth: true },
+          { method: 'POST', path: '/announcements', description: 'Create announcement', auth: true, roles: ['admin', 'hr_manager'] },
+          { method: 'GET', path: '/today', description: 'Today\'s summary', auth: true }
+        ]
+      }
+    },
+    uaeCompliance: {
+      annualLeave: '30 days after 1 year',
+      sickLeave: '90 days (15 full, 30 half, 45 unpaid)',
+      workWeek: '48 hours max (5 or 6 day)',
+      overtime: '125% normal, 150% Friday/Holiday',
+      maternity: '60 days (45 full + 15 half)',
+      paternity: '5 days'
+    }
+  });
+});
+
+// Mount routes
 apiRouter.use('/auth', authRouter);
-apiRouter.use('/employees', employeeRouter);
+apiRouter.use('/employees', employeesRouter);
 apiRouter.use('/attendance', attendanceRouter);
 apiRouter.use('/leave', leaveRouter);
 apiRouter.use('/requests', requestsRouter);
-apiRouter.use('/calendar', calendarRouter);
 apiRouter.use('/policies', policiesRouter);
+apiRouter.use('/calendar', calendarRouter);
 
-// API info endpoint
-apiRouter.get('/', (req, res) => {
+// API health check
+apiRouter.get('/health', (req: Request, res: Response) => {
   res.json({
-    message: 'HR ESS API - UAE Multi-Entity Employee Self-Service System',
-    version: '0.1.0',
-    description: 'Comprehensive HR management system with attendance, leave, policies, and more',
-    endpoints: {
-      auth: {
-        path: '/api/auth',
-        description: 'Authentication (register, login)'
-      },
-      employees: {
-        path: '/api/employees',
-        description: 'Employee management and profiles'
-      },
-      attendance: {
-        path: '/api/attendance',
-        description: 'Clock in/out, attendance tracking, overtime'
-      },
-      leave: {
-        path: '/api/leave',
-        description: 'Leave requests, balance, and approvals'
-      },
-      requests: {
-        path: '/api/requests',
-        description: 'Employee requests (documents, certificates, etc.)'
-      },
-      calendar: {
-        path: '/api/calendar',
-        description: 'Events, deadlines, training, announcements'
-      },
-      policies: {
-        path: '/api/policies',
-        description: 'Company policies, labor law education, acknowledgments'
-      }
-    },
-    features: [
-      'Multi-entity support (UAE)',
-      'Attendance with geolocation',
-      'Leave management with offset days',
-      'Employee request tracking with reference numbers',
-      'Policy acknowledgment (UAE labor law compliance)',
-      'Calendar and announcements',
-      '5/6 day work week support'
-    ]
+    status: 'healthy',
+    timestamp: new Date().toISOString(),
+    uptime: process.uptime(),
+    memory: process.memoryUsage()
   });
 });
 
