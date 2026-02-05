@@ -1,0 +1,867 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+  <meta name="theme-color" content="#6366F1">
+  <title>HR Pass</title>
+  <link rel="manifest" href="/manifest.json">
+  <style>
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+    
+    :root {
+      --primary: #6366F1;
+      --secondary: #8B5CF6;
+      --success: #10B981;
+      --warning: #F59E0B;
+      --danger: #EF4444;
+      --dark: #1F2937;
+      --gray: #6B7280;
+      --light-gray: #E5E7EB;
+      --background: #F9FAFB;
+      --white: #FFFFFF;
+    }
+    
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+      background: var(--background);
+      color: var(--dark);
+      min-height: 100vh;
+      padding-bottom: 80px;
+    }
+    
+    /* Header */
+    .header {
+      background: var(--white);
+      padding: 16px 20px;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      border-bottom: 1px solid var(--light-gray);
+      position: sticky;
+      top: 0;
+      z-index: 100;
+    }
+    .header h1 { font-size: 18px; font-weight: 600; }
+    .header-icon { width: 24px; height: 24px; color: var(--dark); }
+    
+    /* Main Content */
+    .content { padding: 16px; max-width: 480px; margin: 0 auto; }
+    
+    /* Pass Card */
+    .pass-card {
+      background: linear-gradient(135deg, var(--primary) 0%, var(--secondary) 100%);
+      border-radius: 20px;
+      padding: 24px;
+      color: white;
+      margin-bottom: 16px;
+    }
+    .pass-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      margin-bottom: 20px;
+    }
+    .entity-badge {
+      background: rgba(255,255,255,0.2);
+      padding: 6px 12px;
+      border-radius: 20px;
+      font-size: 12px;
+      font-weight: 600;
+    }
+    .pass-body { text-align: center; margin-bottom: 20px; }
+    .avatar {
+      width: 80px;
+      height: 80px;
+      border-radius: 50%;
+      background: rgba(255,255,255,0.2);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      margin: 0 auto 12px;
+      font-size: 28px;
+      font-weight: 700;
+    }
+    .user-name { font-size: 22px; font-weight: 700; margin-bottom: 4px; }
+    .user-position { font-size: 14px; opacity: 0.8; margin-bottom: 4px; }
+    .employee-id { font-size: 12px; opacity: 0.6; }
+    
+    /* Stage Indicator */
+    .stage-container {
+      text-align: center;
+      padding-top: 16px;
+      border-top: 1px solid rgba(255,255,255,0.2);
+    }
+    .stage-line {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 0;
+      margin-bottom: 8px;
+    }
+    .stage-dot {
+      width: 12px;
+      height: 12px;
+      border-radius: 50%;
+      background: rgba(255,255,255,0.3);
+    }
+    .stage-dot.active { background: white; }
+    .stage-track {
+      width: 40px;
+      height: 3px;
+      background: rgba(255,255,255,0.3);
+    }
+    .stage-track.active { background: white; }
+    .stage-label { font-size: 12px; opacity: 0.8; }
+    
+    /* Clock Widget */
+    .clock-widget {
+      background: var(--white);
+      border-radius: 16px;
+      padding: 16px;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      margin-bottom: 16px;
+      box-shadow: 0 2px 8px rgba(0,0,0,0.05);
+    }
+    .clock-info { display: flex; align-items: center; gap: 12px; }
+    .clock-icon { font-size: 32px; }
+    .clock-action { font-size: 16px; font-weight: 600; }
+    .clock-message { font-size: 12px; color: var(--gray); margin-top: 2px; }
+    .clock-btn {
+      width: 56px;
+      height: 56px;
+      border-radius: 50%;
+      background: var(--primary);
+      border: none;
+      color: white;
+      font-size: 12px;
+      font-weight: 700;
+      cursor: pointer;
+      transition: transform 0.2s, background 0.2s;
+    }
+    .clock-btn:active { transform: scale(0.95); }
+    .clock-btn.out { background: var(--danger); }
+    .clock-btn.done { background: var(--success); }
+    
+    /* Section Title */
+    .section-title {
+      font-size: 16px;
+      font-weight: 600;
+      margin: 24px 0 12px;
+    }
+    
+    /* Quick Links */
+    .quick-links {
+      display: grid;
+      grid-template-columns: repeat(4, 1fr);
+      gap: 8px;
+    }
+    .quick-link {
+      text-align: center;
+      text-decoration: none;
+      color: var(--dark);
+    }
+    .quick-link-icon {
+      width: 56px;
+      height: 56px;
+      border-radius: 16px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      margin: 0 auto 8px;
+      font-size: 24px;
+    }
+    .quick-link-label { font-size: 12px; color: var(--gray); }
+    
+    /* Action Cards */
+    .action-cards {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 12px;
+      margin-top: 16px;
+    }
+    .action-card {
+      background: var(--white);
+      border-radius: 16px;
+      padding: 16px;
+      text-decoration: none;
+      color: var(--dark);
+      box-shadow: 0 2px 8px rgba(0,0,0,0.05);
+    }
+    .action-card-icon { font-size: 28px; margin-bottom: 12px; }
+    .action-card-title { font-size: 16px; font-weight: 600; }
+    .action-card-desc { font-size: 12px; color: var(--gray); margin-top: 4px; }
+    
+    /* Profile Button */
+    .profile-btn {
+      display: flex;
+      align-items: center;
+      background: var(--white);
+      border-radius: 12px;
+      padding: 16px;
+      margin-top: 16px;
+      text-decoration: none;
+      color: var(--gray);
+    }
+    .profile-btn span { flex: 1; margin-left: 12px; font-size: 14px; }
+    
+    /* Bottom Nav */
+    .bottom-nav {
+      position: fixed;
+      bottom: 0;
+      left: 0;
+      right: 0;
+      background: var(--white);
+      display: flex;
+      border-top: 1px solid var(--light-gray);
+      padding: 8px 0 calc(8px + env(safe-area-inset-bottom));
+    }
+    .nav-item {
+      flex: 1;
+      text-align: center;
+      padding: 8px;
+      text-decoration: none;
+      color: var(--gray);
+      font-size: 10px;
+    }
+    .nav-item.active { color: var(--primary); font-weight: 600; }
+    .nav-item-icon { font-size: 24px; margin-bottom: 4px; }
+    
+    /* Screens */
+    .screen { display: none; }
+    .screen.active { display: block; }
+    
+    /* Page Header */
+    .page-title { font-size: 24px; font-weight: 700; margin-top: 16px; }
+    .page-subtitle { font-size: 14px; color: var(--gray); margin: 4px 0 24px; }
+    
+    /* Topic Cards */
+    .topic-card {
+      background: var(--white);
+      border-radius: 12px;
+      padding: 16px;
+      display: flex;
+      align-items: center;
+      margin-bottom: 8px;
+      text-decoration: none;
+      color: var(--dark);
+    }
+    .topic-icon { font-size: 24px; margin-right: 12px; }
+    .topic-title { flex: 1; font-size: 15px; font-weight: 500; }
+    .quiz-badge {
+      background: rgba(99, 102, 241, 0.1);
+      color: var(--primary);
+      padding: 4px 8px;
+      border-radius: 8px;
+      font-size: 10px;
+      font-weight: 600;
+      margin-right: 8px;
+    }
+    
+    /* Search */
+    .search-box { display: flex; gap: 8px; }
+    .search-input {
+      flex: 1;
+      background: var(--white);
+      border: 1px solid var(--light-gray);
+      border-radius: 12px;
+      padding: 14px 16px;
+      font-size: 16px;
+      outline: none;
+    }
+    .search-input:focus { border-color: var(--primary); }
+    .search-btn {
+      width: 52px;
+      background: var(--primary);
+      border: none;
+      border-radius: 12px;
+      color: white;
+      font-size: 20px;
+      cursor: pointer;
+    }
+    
+    /* Result Card */
+    .result-card {
+      background: var(--white);
+      border-radius: 16px;
+      padding: 20px;
+      margin-top: 16px;
+    }
+    .result-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      margin-bottom: 12px;
+    }
+    .result-ref { font-size: 16px; font-weight: 600; }
+    .status-badge {
+      padding: 6px 12px;
+      border-radius: 20px;
+      color: white;
+      font-size: 12px;
+      font-weight: 600;
+    }
+    .status-pending { background: var(--warning); }
+    .status-approved { background: var(--success); }
+    .status-rejected { background: var(--danger); }
+    .result-details {
+      padding-top: 12px;
+      border-top: 1px solid var(--light-gray);
+    }
+    .result-type { font-size: 14px; color: var(--gray); }
+    .result-dates { font-size: 14px; font-weight: 500; margin-top: 4px; }
+    .hint { margin-top: 16px; font-size: 12px; color: var(--gray); text-align: center; }
+    
+    /* Profile Screen */
+    .profile-header { text-align: center; padding: 24px 0; }
+    .profile-avatar {
+      width: 100px;
+      height: 100px;
+      border-radius: 50%;
+      background: var(--primary);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      margin: 0 auto 16px;
+      color: white;
+      font-size: 36px;
+      font-weight: 700;
+    }
+    .profile-name { font-size: 24px; font-weight: 700; }
+    .profile-position { font-size: 16px; color: var(--gray); margin-top: 4px; }
+    .profile-entity { font-size: 14px; color: var(--primary); margin-top: 4px; }
+    .profile-section {
+      background: var(--white);
+      border-radius: 16px;
+      padding: 16px;
+      margin-bottom: 16px;
+    }
+    .profile-section-title {
+      font-size: 14px;
+      font-weight: 600;
+      color: var(--gray);
+      margin-bottom: 12px;
+    }
+    .profile-row {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      padding: 12px 0;
+      border-bottom: 1px solid var(--light-gray);
+    }
+    .profile-row:last-child { border-bottom: none; }
+    .profile-label { font-size: 14px; color: var(--gray); }
+    .profile-value { font-size: 14px; font-weight: 500; }
+    .active-badge {
+      background: rgba(16, 185, 129, 0.1);
+      color: var(--success);
+      padding: 4px 10px;
+      border-radius: 8px;
+      font-size: 12px;
+      font-weight: 600;
+    }
+    .leave-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 12px; }
+    .leave-card {
+      background: var(--background);
+      border-radius: 12px;
+      padding: 12px;
+      text-align: center;
+    }
+    .leave-type { font-size: 12px; color: var(--gray); margin-bottom: 4px; }
+    .leave-count { font-size: 28px; font-weight: 700; color: var(--primary); }
+    .leave-label { font-size: 10px; color: var(--gray); }
+    
+    /* Education Content */
+    .topic-content {
+      background: var(--white);
+      border-radius: 16px;
+      padding: 20px;
+      margin-top: 16px;
+      line-height: 1.6;
+    }
+    .topic-content h2 { font-size: 18px; margin: 16px 0 8px; }
+    .topic-content h3 { font-size: 16px; margin: 12px 0 8px; color: var(--gray); }
+    .topic-content p { margin: 8px 0; }
+    .topic-content ul { margin: 8px 0; padding-left: 20px; }
+    .topic-content li { margin: 4px 0; }
+    .topic-content table { width: 100%; border-collapse: collapse; margin: 12px 0; }
+    .topic-content th, .topic-content td {
+      padding: 8px;
+      text-align: left;
+      border-bottom: 1px solid var(--light-gray);
+    }
+    .topic-content th { font-weight: 600; background: var(--background); }
+    
+    .back-btn {
+      display: inline-flex;
+      align-items: center;
+      gap: 8px;
+      color: var(--primary);
+      font-weight: 500;
+      text-decoration: none;
+      margin-bottom: 8px;
+    }
+
+    /* Loading */
+    .loading { 
+      display: inline-block;
+      width: 20px;
+      height: 20px;
+      border: 2px solid rgba(255,255,255,0.3);
+      border-radius: 50%;
+      border-top-color: white;
+      animation: spin 1s linear infinite;
+    }
+    @keyframes spin { to { transform: rotate(360deg); } }
+  </style>
+</head>
+<body>
+
+  <!-- Header -->
+  <header class="header">
+    <span id="headerBack" style="width: 24px; cursor: pointer; display: none;">←</span>
+    <h1 id="headerTitle">HR Pass</h1>
+    <span style="width: 24px;">🔔</span>
+  </header>
+
+  <!-- Home Screen -->
+  <div id="homeScreen" class="screen active">
+    <div class="content">
+      <!-- Pass Card -->
+      <div class="pass-card">
+        <div class="pass-header">
+          <span class="entity-badge">TechCorp UAE</span>
+          <span style="font-size: 24px;">📱</span>
+        </div>
+        <div class="pass-body">
+          <div class="avatar">AM</div>
+          <div class="user-name">Ahmed Al Mansoori</div>
+          <div class="user-position">Software Engineer</div>
+          <div class="employee-id">EMP-001</div>
+        </div>
+        <div class="stage-container">
+          <div class="stage-line">
+            <div class="stage-dot active"></div>
+            <div class="stage-track active"></div>
+            <div class="stage-dot active"></div>
+            <div class="stage-track active"></div>
+            <div class="stage-dot active"></div>
+            <div class="stage-track"></div>
+            <div class="stage-dot"></div>
+          </div>
+          <div class="stage-label">Stage: Confirmed</div>
+        </div>
+      </div>
+
+      <!-- Clock Widget -->
+      <div class="clock-widget">
+        <div class="clock-info">
+          <span class="clock-icon">👆</span>
+          <div>
+            <div class="clock-action" id="clockAction">Clock In</div>
+            <div class="clock-message" id="clockMessage">Ready to start your day</div>
+          </div>
+        </div>
+        <button class="clock-btn" id="clockBtn" onclick="handleClock()">TAP</button>
+      </div>
+
+      <!-- Quick Links -->
+      <div class="section-title">Quick Links</div>
+      <div class="quick-links">
+        <a href="#" class="quick-link" onclick="showScreen('leave')">
+          <div class="quick-link-icon" style="background: rgba(99,102,241,0.1);">📅</div>
+          <div class="quick-link-label">Leave</div>
+        </a>
+        <a href="#" class="quick-link" onclick="showScreen('documents')">
+          <div class="quick-link-icon" style="background: rgba(139,92,246,0.1);">📄</div>
+          <div class="quick-link-label">Documents</div>
+        </a>
+        <a href="#" class="quick-link" onclick="showScreen('attendance')">
+          <div class="quick-link-icon" style="background: rgba(16,185,129,0.1);">⏰</div>
+          <div class="quick-link-label">Attendance</div>
+        </a>
+        <a href="#" class="quick-link" onclick="showScreen('policies')">
+          <div class="quick-link-icon" style="background: rgba(245,158,11,0.1);">📋</div>
+          <div class="quick-link-label">Policies</div>
+        </a>
+      </div>
+
+      <!-- Action Cards -->
+      <div class="action-cards">
+        <a href="#" class="action-card" onclick="showScreen('status')">
+          <div class="action-card-icon">🔍</div>
+          <div class="action-card-title">Check Status</div>
+          <div class="action-card-desc">Track your requests</div>
+        </a>
+        <a href="#" class="action-card" onclick="showScreen('education')">
+          <div class="action-card-icon">📚</div>
+          <div class="action-card-title">Learn</div>
+          <div class="action-card-desc">UAE Labor Law</div>
+        </a>
+      </div>
+
+      <!-- Profile Button -->
+      <a href="#" class="profile-btn" onclick="showScreen('profile')">
+        <span style="font-size: 24px;">👤</span>
+        <span>View Full Profile</span>
+        <span>→</span>
+      </a>
+    </div>
+  </div>
+
+  <!-- Education Screen -->
+  <div id="educationScreen" class="screen">
+    <div class="content">
+      <h2 class="page-title">📚 Employee Education</h2>
+      <p class="page-subtitle">Learn about your rights and best practices</p>
+
+      <div class="section-title">UAE Labor Law</div>
+      <a href="#" class="topic-card" onclick="showTopic('working-hours')">
+        <span class="topic-icon">⏰</span>
+        <span class="topic-title">Working Hours</span>
+        <span class="quiz-badge">Quiz</span>
+        <span>→</span>
+      </a>
+      <a href="#" class="topic-card" onclick="showTopic('annual-leave')">
+        <span class="topic-icon">🏖️</span>
+        <span class="topic-title">Annual Leave</span>
+        <span class="quiz-badge">Quiz</span>
+        <span>→</span>
+      </a>
+      <a href="#" class="topic-card" onclick="showTopic('sick-leave')">
+        <span class="topic-icon">🏥</span>
+        <span class="topic-title">Sick Leave</span>
+        <span class="quiz-badge">Quiz</span>
+        <span>→</span>
+      </a>
+      <a href="#" class="topic-card" onclick="showTopic('maternity')">
+        <span class="topic-icon">👶</span>
+        <span class="topic-title">Maternity & Paternity</span>
+        <span class="quiz-badge">Quiz</span>
+        <span>→</span>
+      </a>
+      <a href="#" class="topic-card" onclick="showTopic('gratuity')">
+        <span class="topic-icon">💰</span>
+        <span class="topic-title">End of Service Benefits</span>
+        <span class="quiz-badge">Quiz</span>
+        <span>→</span>
+      </a>
+
+      <div class="section-title">Tips & Guides</div>
+      <a href="#" class="topic-card">
+        <span class="topic-icon">🕐</span>
+        <span class="topic-title">Clock In/Out Tips</span>
+        <span>→</span>
+      </a>
+      <a href="#" class="topic-card">
+        <span class="topic-icon">📝</span>
+        <span class="topic-title">Leave Request Best Practices</span>
+        <span>→</span>
+      </a>
+    </div>
+  </div>
+
+  <!-- Check Status Screen -->
+  <div id="statusScreen" class="screen">
+    <div class="content">
+      <h2 class="page-title">🔍 Check Request Status</h2>
+      <p class="page-subtitle">Enter your reference number to track</p>
+
+      <div class="search-box">
+        <input type="text" class="search-input" id="searchInput" placeholder="e.g., LV-202402-0001">
+        <button class="search-btn" onclick="checkStatus()">🔍</button>
+      </div>
+
+      <div id="searchResult"></div>
+
+      <p class="hint">💡 Reference numbers start with LV (leave) or REQ (documents)</p>
+    </div>
+  </div>
+
+  <!-- Profile Screen -->
+  <div id="profileScreen" class="screen">
+    <div class="content">
+      <div class="profile-header">
+        <div class="profile-avatar">AM</div>
+        <div class="profile-name">Ahmed Al Mansoori</div>
+        <div class="profile-position">Software Engineer</div>
+        <div class="profile-entity">TechCorp UAE</div>
+      </div>
+
+      <div class="profile-section">
+        <div class="profile-section-title">Employment</div>
+        <div class="profile-row">
+          <span class="profile-label">Employee ID</span>
+          <span class="profile-value">EMP-001</span>
+        </div>
+        <div class="profile-row">
+          <span class="profile-label">Department</span>
+          <span class="profile-value">Engineering</span>
+        </div>
+        <div class="profile-row">
+          <span class="profile-label">Join Date</span>
+          <span class="profile-value">Jan 15, 2024</span>
+        </div>
+        <div class="profile-row">
+          <span class="profile-label">Status</span>
+          <span class="active-badge">Active</span>
+        </div>
+      </div>
+
+      <div class="profile-section">
+        <div class="profile-section-title">Leave Balance</div>
+        <div class="leave-grid">
+          <div class="leave-card">
+            <div class="leave-type">Annual</div>
+            <div class="leave-count">25</div>
+            <div class="leave-label">days left</div>
+          </div>
+          <div class="leave-card">
+            <div class="leave-type">Sick</div>
+            <div class="leave-count">13</div>
+            <div class="leave-label">days left</div>
+          </div>
+          <div class="leave-card">
+            <div class="leave-type">Personal</div>
+            <div class="leave-count">3</div>
+            <div class="leave-label">days left</div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Topic Detail Screen -->
+  <div id="topicScreen" class="screen">
+    <div class="content">
+      <a href="#" class="back-btn" onclick="showScreen('education')">← Back to Education</a>
+      <div id="topicContent"></div>
+    </div>
+  </div>
+
+  <!-- Bottom Nav -->
+  <nav class="bottom-nav">
+    <a href="#" class="nav-item active" id="navHome" onclick="showScreen('home')">
+      <div class="nav-item-icon">🏠</div>
+      Home
+    </a>
+    <a href="#" class="nav-item" id="navEducation" onclick="showScreen('education')">
+      <div class="nav-item-icon">📚</div>
+      Learn
+    </a>
+    <a href="#" class="nav-item" id="navStatus" onclick="showScreen('status')">
+      <div class="nav-item-icon">🔍</div>
+      Status
+    </a>
+    <a href="#" class="nav-item" id="navProfile" onclick="showScreen('profile')">
+      <div class="nav-item-icon">👤</div>
+      Profile
+    </a>
+  </nav>
+
+  <script>
+    // Clock state
+    let clockState = 'out'; // out, in, done
+    
+    function showScreen(screen) {
+      // Hide all screens
+      document.querySelectorAll('.screen').forEach(s => s.classList.remove('active'));
+      document.querySelectorAll('.nav-item').forEach(n => n.classList.remove('active'));
+      
+      // Show selected screen
+      const screenMap = {
+        'home': 'homeScreen',
+        'education': 'educationScreen',
+        'status': 'statusScreen',
+        'profile': 'profileScreen',
+        'topic': 'topicScreen'
+      };
+      
+      const screenId = screenMap[screen] || 'homeScreen';
+      document.getElementById(screenId).classList.add('active');
+      
+      // Update nav
+      const navId = 'nav' + screen.charAt(0).toUpperCase() + screen.slice(1);
+      const nav = document.getElementById(navId);
+      if (nav) nav.classList.add('active');
+      
+      // Update header
+      const titles = {
+        'home': 'HR Pass',
+        'education': 'Learn',
+        'status': 'Check Status',
+        'profile': 'My Profile',
+        'topic': 'Topic Details'
+      };
+      document.getElementById('headerTitle').textContent = titles[screen] || 'HR Pass';
+      
+      // Show/hide back button
+      const backBtn = document.getElementById('headerBack');
+      if (screen === 'home') {
+        backBtn.style.display = 'none';
+      } else {
+        backBtn.style.display = 'block';
+        backBtn.onclick = () => showScreen('home');
+      }
+    }
+    
+    function handleClock() {
+      const btn = document.getElementById('clockBtn');
+      const action = document.getElementById('clockAction');
+      const message = document.getElementById('clockMessage');
+      
+      btn.innerHTML = '<span class="loading"></span>';
+      
+      setTimeout(() => {
+        if (clockState === 'out') {
+          clockState = 'in';
+          btn.textContent = 'TAP';
+          btn.className = 'clock-btn out';
+          action.textContent = 'Clock Out';
+          message.textContent = 'Clocked in at ' + new Date().toLocaleTimeString();
+        } else if (clockState === 'in') {
+          clockState = 'done';
+          btn.textContent = '✓';
+          btn.className = 'clock-btn done';
+          action.textContent = 'Done';
+          message.textContent = 'Great work today! 8h 15m';
+        }
+      }, 800);
+    }
+    
+    function checkStatus() {
+      const ref = document.getElementById('searchInput').value.trim();
+      const resultDiv = document.getElementById('searchResult');
+      
+      if (!ref) {
+        resultDiv.innerHTML = '<div class="result-card" style="text-align:center;color:var(--warning);">Please enter a reference number</div>';
+        return;
+      }
+      
+      // Simulate search
+      resultDiv.innerHTML = '<div class="result-card" style="text-align:center;"><span class="loading" style="border-color:var(--primary);border-top-color:var(--primary);"></span></div>';
+      
+      setTimeout(() => {
+        // Demo result
+        resultDiv.innerHTML = `
+          <div class="result-card">
+            <div class="result-header">
+              <span class="result-ref">${ref}</span>
+              <span class="status-badge status-pending">Pending</span>
+            </div>
+            <div class="result-details">
+              <div class="result-type">Annual Leave Request</div>
+              <div class="result-dates">Feb 10, 2026 → Feb 14, 2026</div>
+            </div>
+          </div>
+        `;
+      }, 600);
+    }
+    
+    const topicContents = {
+      'working-hours': `
+        <h2>⏰ Working Hours in UAE</h2>
+        <div class="topic-content">
+          <h3>Standard Working Hours</h3>
+          <ul>
+            <li><strong>Maximum:</strong> 8 hours per day, 48 hours per week</li>
+            <li><strong>During Ramadan:</strong> Reduced by 2 hours per day</li>
+          </ul>
+          
+          <h3>Breaks</h3>
+          <p>Employees must not work more than 5 consecutive hours without a break. Break time is not counted as working hours.</p>
+          
+          <h3>Overtime Pay</h3>
+          <table>
+            <tr><th>Type</th><th>Rate</th></tr>
+            <tr><td>Normal days</td><td>125%</td></tr>
+            <tr><td>Night (10pm-4am)</td><td>150%</td></tr>
+            <tr><td>Fridays/Holidays</td><td>150%</td></tr>
+          </table>
+        </div>
+      `,
+      'annual-leave': `
+        <h2>🏖️ Annual Leave</h2>
+        <div class="topic-content">
+          <h3>Entitlement</h3>
+          <p><strong>30 calendar days</strong> per year after completing 1 year of service.</p>
+          
+          <h3>Key Rules</h3>
+          <ul>
+            <li>Leave salary is paid in advance</li>
+            <li>Public holidays are not counted as leave days</li>
+            <li>Unused leave can be carried forward (max 2 years)</li>
+          </ul>
+          
+          <h3>Calculation</h3>
+          <p>Based on basic salary + housing allowance.</p>
+        </div>
+      `,
+      'sick-leave': `
+        <h2>🏥 Sick Leave</h2>
+        <div class="topic-content">
+          <h3>Total Entitlement: 90 Days per Year</h3>
+          <table>
+            <tr><th>Period</th><th>Pay Rate</th></tr>
+            <tr><td>First 15 days</td><td>Full pay (100%)</td></tr>
+            <tr><td>Next 30 days</td><td>Half pay (50%)</td></tr>
+            <tr><td>Remaining 45 days</td><td>No pay (0%)</td></tr>
+          </table>
+          
+          <h3>Requirements</h3>
+          <ul>
+            <li>Complete 3 months probation</li>
+            <li>Medical certificate for absences over 2 days</li>
+          </ul>
+        </div>
+      `,
+      'maternity': `
+        <h2>👶 Maternity & Paternity Leave</h2>
+        <div class="topic-content">
+          <h3>Maternity Leave: 60 Days</h3>
+          <ul>
+            <li><strong>First 45 days:</strong> Full pay</li>
+            <li><strong>Next 15 days:</strong> Half pay</li>
+            <li>Can extend with 45 days unpaid</li>
+          </ul>
+          
+          <h3>Paternity Leave: 5 Working Days</h3>
+          <ul>
+            <li>Must be taken within 6 months of birth</li>
+            <li>Full pay during leave</li>
+          </ul>
+        </div>
+      `,
+      'gratuity': `
+        <h2>💰 End of Service Benefits</h2>
+        <div class="topic-content">
+          <h3>Gratuity Calculation</h3>
+          <table>
+            <tr><th>Service Period</th><th>Gratuity</th></tr>
+            <tr><td>Less than 1 year</td><td>None</td></tr>
+            <tr><td>1-5 years</td><td>21 days per year</td></tr>
+            <tr><td>5+ years</td><td>30 days per year (after 5)</td></tr>
+          </table>
+          
+          <h3>Maximum Cap</h3>
+          <p>Total gratuity cannot exceed 2 years' salary.</p>
+        </div>
+      `
+    };
+    
+    function showTopic(topicId) {
+      document.getElementById('topicContent').innerHTML = topicContents[topicId] || '<p>Topic not found</p>';
+      showScreen('topic');
+    }
+    
+    // Register service worker for PWA
+    if ('serviceWorker' in navigator) {
+      navigator.serviceWorker.register('/sw.js').catch(() => {});
+    }
+  </script>
+</body>
+</html>
