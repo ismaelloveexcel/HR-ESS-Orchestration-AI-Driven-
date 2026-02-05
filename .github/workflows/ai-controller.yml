@@ -1,0 +1,637 @@
+name: AI-DAN Supervisor 🤖
+
+on:
+  # 1. MONITOR ALL ISSUE ACTIVITY (new, edited, labeled, closed, reopened)
+  issues:
+    types: [opened, edited, labeled, closed, reopened, assigned]
+  # 2. MONITOR PULL REQUEST ACTIVITY
+  pull_request:
+    types: [opened, edited, labeled, closed, reopened, synchronize, review_requested]
+  # 3. MONITOR WORKFLOW SUCCESS/FAILURE
+  workflow_run:
+    workflows: ["Deploy to Azure 🚀", "Agent - Research Specialist 🕵️", "Agent - Blueprint Architect 🏗️", "Agent - POC Developer 💻"]
+    types: [completed, requested, in_progress]
+  # 4. PERIODIC HEALTH CHECKS (Runs every 4 hours instead of 6 for more frequent monitoring)
+  schedule:
+    - cron: '0 */4 * * *'
+  # 5. MANUAL TRIGGER for testing and emergency interventions
+  workflow_dispatch:
+    inputs:
+      force_action:
+        description: 'Force a specific action (investigate, health-check, auto-fix)'
+        required: false
+        default: 'health-check'
+        type: choice
+        options:
+          - investigate
+          - health-check
+          - auto-fix
+      context:
+        description: 'Additional context for the action'
+        required: false
+        default: ''
+
+jobs:
+  oversee-and-act:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15  # Prevent runaway workflows
+    # Grant permissions to read the full repo context and write issues/comments
+    permissions:
+      contents: write  # Enhanced to write for creating files if needed
+      issues: write
+      actions: read
+      pull-requests: write  # Added PR permissions
+      checks: read
+    
+    steps:
+      - name: Checkout repository (to analyze code/state if needed)
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0  # Full history for better analysis
+      
+      - name: Setup Environment & Dependencies
+        run: |
+          # Install jq for JSON processing
+          sudo apt-get update -qq
+          sudo apt-get install -y jq curl
+          
+          # Create working directories
+          mkdir -p .ai-supervisor/{logs,state,cache}
+          
+          echo "✅ Environment setup complete"
+
+      - name: Gather Repository Intelligence
+        id: gather
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          # --- COMPREHENSIVE REPOSITORY STATE ANALYSIS ---
+          CONTEXT_INFO=""
+          REPO="${{ github.repository }}"
+          
+          echo "🔍 Gathering repository intelligence..."
+          
+          # 1. EVENT-SPECIFIC CONTEXT
+          EVENT_TYPE="${{ github.event_name }}"
+          echo "Event Type: $EVENT_TYPE"
+          
+          if [ "$EVENT_TYPE" = "workflow_run" ]; then
+            WF_NAME="${{ github.event.workflow_run.name }}"
+            WF_STATUS="${{ github.event.workflow_run.conclusion }}"
+            WF_ID="${{ github.event.workflow_run.id }}"
+            WF_URL="${{ github.event.workflow_run.html_url }}"
+            
+            CONTEXT_INFO="WORKFLOW_EVENT: Workflow '$WF_NAME' (#$WF_ID) completed with status: $WF_STATUS. URL: $WF_URL"
+            
+            if [ "$WF_STATUS" = "failure" ]; then
+              CONTEXT_INFO="$CONTEXT_INFO\n🚨 CRITICAL: Workflow failed and needs attention."
+            fi
+          fi
+          
+          if [ "$EVENT_TYPE" = "issues" ]; then
+            ISSUE_NUM="${{ github.event.issue.number }}"
+            ISSUE_TITLE="${{ github.event.issue.title }}"
+            ISSUE_ACTION="${{ github.event.action }}"
+            ISSUE_LABELS=$(echo '${{ toJson(github.event.issue.labels) }}' | jq -r '.[].name' | tr '\n' ',' | sed 's/,$//')
+            ISSUE_BODY=$(echo '${{ github.event.issue.body }}' | head -c 500)  # Limit size
+            
+            CONTEXT_INFO="ISSUE_EVENT: Action=$ISSUE_ACTION, Issue #$ISSUE_NUM: '$ISSUE_TITLE'. Labels: [$ISSUE_LABELS]. Body: $ISSUE_BODY"
+          fi
+          
+          if [ "$EVENT_TYPE" = "pull_request" ]; then
+            PR_NUM="${{ github.event.pull_request.number }}"
+            PR_TITLE="${{ github.event.pull_request.title }}"
+            PR_ACTION="${{ github.event.action }}"
+            PR_STATE="${{ github.event.pull_request.state }}"
+            
+            CONTEXT_INFO="PR_EVENT: Action=$PR_ACTION, PR #$PR_NUM: '$PR_TITLE', State: $PR_STATE"
+          fi
+          
+          if [ "$EVENT_TYPE" = "schedule" ]; then
+            CONTEXT_INFO="SCHEDULED_HEALTH_CHECK: Periodic repository health monitoring"
+          fi
+          
+          if [ "$EVENT_TYPE" = "workflow_dispatch" ]; then
+            FORCE_ACTION="${{ github.event.inputs.force_action }}"
+            MANUAL_CONTEXT="${{ github.event.inputs.context }}"
+            CONTEXT_INFO="MANUAL_TRIGGER: Action=$FORCE_ACTION, Context: $MANUAL_CONTEXT"
+          fi
+          
+          # 2. REPOSITORY HEALTH CHECKS
+          echo "🏥 Performing health checks..."
+          HEALTH_ISSUES=""
+          
+          # Check critical workflow files
+          if [ ! -f ".github/workflows/deploy-azure.yml" ]; then
+            HEALTH_ISSUES="$HEALTH_ISSUES\n⚠️ Missing deployment workflow: .github/workflows/deploy-azure.yml"
+          fi
+          
+          # Check application structure
+          if [ ! -d "app" ] && [ ! -d "src" ]; then
+            HEALTH_ISSUES="$HEALTH_ISSUES\n⚠️ Missing application directory (app/ or src/)"
+          fi
+          
+          # Check documentation
+          if [ ! -f "README.md" ]; then
+            HEALTH_ISSUES="$HEALTH_ISSUES\n⚠️ Missing README.md"
+          fi
+          
+          # Check configuration files
+          for file in "package.json" "requirements.txt" "pom.xml" "go.mod"; do
+            if [ -f "$file" ]; then
+              echo "✅ Found dependency file: $file"
+              break
+            fi
+          done
+          
+          if [ -n "$HEALTH_ISSUES" ]; then
+            CONTEXT_INFO="$CONTEXT_INFO\n\nHEALTH_ISSUES:$HEALTH_ISSUES"
+          fi
+          
+          # 3. RECENT WORKFLOW STATUS (API call with retry)
+          echo "📊 Checking recent workflow runs..."
+          RETRY_COUNT=0
+          MAX_RETRIES=3
+          
+          while [ $RETRY_COUNT -lt $MAX_RETRIES ]; do
+            WORKFLOW_STATUS=$(curl -s -w "\n%{http_code}" \
+              -H "Authorization: Bearer $GH_TOKEN" \
+              -H "Accept: application/vnd.github.v3+json" \
+              "https://api.github.com/repos/$REPO/actions/runs?per_page=5" 2>/dev/null)
+            
+            HTTP_CODE=$(echo "$WORKFLOW_STATUS" | tail -n1)
+            
+            if [ "$HTTP_CODE" = "200" ]; then
+              WORKFLOW_DATA=$(echo "$WORKFLOW_STATUS" | sed '$d')
+              FAILED_RUNS=$(echo "$WORKFLOW_DATA" | jq -r '.workflow_runs[] | select(.conclusion=="failure") | "\(.name) (#\(.id))"' | head -3)
+              
+              if [ -n "$FAILED_RUNS" ]; then
+                CONTEXT_INFO="$CONTEXT_INFO\n\nRECENT_FAILURES:\n$FAILED_RUNS"
+              fi
+              break
+            else
+              RETRY_COUNT=$((RETRY_COUNT + 1))
+              echo "⚠️ API call failed (HTTP $HTTP_CODE), retry $RETRY_COUNT/$MAX_RETRIES"
+              sleep 2
+            fi
+          done
+          
+          # 4. OPEN ISSUES ANALYSIS
+          echo "📋 Analyzing open issues..."
+          OPEN_ISSUES=$(curl -s \
+            -H "Authorization: Bearer $GH_TOKEN" \
+            -H "Accept: application/vnd.github.v3+json" \
+            "https://api.github.com/repos/$REPO/issues?state=open&per_page=10" 2>/dev/null)
+          
+          if [ -n "$OPEN_ISSUES" ]; then
+            HIGH_PRIORITY=$(echo "$OPEN_ISSUES" | jq -r '.[] | select(.labels[]?.name | contains("HIGH") or contains("critical") or contains("urgent")) | "#\(.number): \(.title)"' | head -3)
+            STALE_ISSUES=$(echo "$OPEN_ISSUES" | jq -r '.[] | select(.updated_at | fromdateiso8601 < (now - 604800)) | "#\(.number): \(.title)"' | head -3)  # 7 days old
+            
+            if [ -n "$HIGH_PRIORITY" ]; then
+              CONTEXT_INFO="$CONTEXT_INFO\n\nHIGH_PRIORITY_ISSUES:\n$HIGH_PRIORITY"
+            fi
+            
+            if [ -n "$STALE_ISSUES" ]; then
+              CONTEXT_INFO="$CONTEXT_INFO\n\nSTALE_ISSUES (>7 days):\n$STALE_ISSUES"
+            fi
+          fi
+          
+          # Save context for next step
+          echo "$CONTEXT_INFO" > .ai-supervisor/logs/context.txt
+          echo "gathered_context<<EOF" >> $GITHUB_OUTPUT
+          echo "$CONTEXT_INFO" >> $GITHUB_OUTPUT
+          echo "EOF" >> $GITHUB_OUTPUT
+          
+          echo "✅ Intelligence gathering complete"
+
+      - name: AI Decision Engine
+        id: analyze
+        env:
+          OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          # --- ENHANCED AI DECISION MAKING WITH ERROR HANDLING ---
+          
+          CONTEXT_INFO=$(cat .ai-supervisor/logs/context.txt)
+          
+          echo "🤖 Invoking AI Decision Engine..."
+          
+          # Enhanced prompt with more specific instructions
+          PROMPT=$(cat <<'EOFPROMPT'
+You are AI-DAN, the autonomous supervisor of the HR ESS Orchestration repository.
+Your mission: Maintain repository health, accelerate development, and minimize human intervention.
+
+**CURRENT CONTEXT:**
+${CONTEXT_PLACEHOLDER}
+
+**YOUR CAPABILITIES:**
+1. RESEARCH_AGENT: Information gathering, tool evaluation, documentation, file generation (YAML, MD, JSON)
+2. BLUEPRINT_AGENT: Architecture design, system diagrams, technical planning, infrastructure setup
+3. POC_AGENT: Code implementation, feature development, bug fixes, testing
+4. SELF: Create issues, comment on issues/PRs, apply labels, trigger workflows, auto-assign tasks
+
+**DECISION FRAMEWORK:**
+- Workflow Failures: CREATE_ISSUE (HIGH urgency) + assign to relevant agent for investigation/fix
+- New Feature Requests: TRIGGER_AGENT (POC_AGENT or RESEARCH_AGENT based on scope)
+- Missing Critical Files/Dirs: TRIGGER_AGENT (POC_AGENT) to create + CREATE_ISSUE for tracking
+- Documentation Gaps: TRIGGER_AGENT (RESEARCH_AGENT) to document
+- Stale Issues (>7 days): COMMENT requesting updates or AUTO_CLOSE if resolved
+- High Priority Issues: Escalate urgency, TRIGGER_AGENT immediately
+- PR Reviews Needed: COMMENT with automated review or TRIGGER_AGENT for detailed analysis
+- Health Check (no issues): IGNORE and log "All systems operational"
+- Questions from Users: COMMENT with guidance or TRIGGER_AGENT for research
+- Multiple Related Issues: CREATE_PARENT_ISSUE to track epic
+
+**SELF-SUFFICIENCY RULES:**
+1. Default to action over inaction
+2. Prefer triggering agents to creating issues when work can be automated
+3. Auto-label issues by category (bug, enhancement, documentation, infrastructure)
+4. Auto-assign based on expertise (RESEARCH=docs, BLUEPRINT=design, POC=code)
+5. Track estimated effort (small <4h, medium 4-16h, large >16h)
+
+**OUTPUT FORMAT (STRICT JSON):**
+{
+  "decision": "CREATE_ISSUE | TRIGGER_AGENT | COMMENT | AUTO_ASSIGN | AUTO_LABEL | AUTO_CLOSE | IGNORE",
+  "agent": "RESEARCH_AGENT | BLUEPRINT_AGENT | POC_AGENT | null",
+  "urgency": "HIGH | MEDIUM | LOW",
+  "reason": "One sentence explanation of decision logic",
+  "title": "Clear, actionable title (if creating issue)",
+  "body": "Detailed instructions with acceptance criteria (if creating/commenting)",
+  "labels": ["label1", "label2"],
+  "assignee": "agent-name or null",
+  "estimated_effort": "small | medium | large | null"
+}
+
+**EXAMPLES:**
+- Workflow failed: {"decision": "CREATE_ISSUE", "urgency": "HIGH", "title": "Fix Deploy Failure", "labels": ["bug", "HIGH"], "agent": "POC_AGENT"}
+- Missing app/: {"decision": "TRIGGER_AGENT", "agent": "POC_AGENT", "urgency": "MEDIUM", "title": "Create application structure"}
+- User asks question: {"decision": "COMMENT", "urgency": "LOW", "body": "Helpful response with next steps"}
+
+Analyze the context above and output ONLY valid JSON.
+EOFPROMPT
+)
+          
+          # Replace placeholder with actual context (handle special characters)
+          PROMPT=$(echo "$PROMPT" | sed "s|\${CONTEXT_PLACEHOLDER}|$CONTEXT_INFO|g")
+          
+          # Retry logic for OpenAI API
+          RETRY_COUNT=0
+          MAX_RETRIES=3
+          SUCCESS=false
+          
+          while [ $RETRY_COUNT -lt $MAX_RETRIES ] && [ "$SUCCESS" = "false" ]; do
+            echo "🔄 Attempt $((RETRY_COUNT + 1))/$MAX_RETRIES to call OpenAI API..."
+            
+            # Call OpenAI API with timeout
+            RESPONSE=$(timeout 30s curl -s https://api.openai.com/v1/chat/completions \
+              -H "Authorization: Bearer $OPENAI_API_KEY" \
+              -H "Content-Type: application/json" \
+              -d @- <<EOFCURL
+{
+  "model": "gpt-4-turbo-preview",
+  "messages": [
+    {
+      "role": "system",
+      "content": "You are an autonomous DevOps supervisor AI. Always respond with valid JSON only."
+    },
+    {
+      "role": "user",
+      "content": $(echo "$PROMPT" | jq -Rs .)
+    }
+  ],
+  "temperature": 0.2,
+  "max_tokens": 1000,
+  "response_format": { "type": "json_object" }
+}
+EOFCURL
+            2>&1)
+            
+            # Check if response is valid
+            if echo "$RESPONSE" | jq empty 2>/dev/null; then
+              # Extract decision
+              DECISION_JSON=$(echo "$RESPONSE" | jq -r '.choices[0].message.content' 2>/dev/null)
+              
+              if [ -n "$DECISION_JSON" ] && echo "$DECISION_JSON" | jq empty 2>/dev/null; then
+                echo "$DECISION_JSON" > .ai-supervisor/logs/decision.json
+                SUCCESS=true
+                echo "✅ AI decision received successfully"
+                break
+              fi
+            fi
+            
+            RETRY_COUNT=$((RETRY_COUNT + 1))
+            if [ $RETRY_COUNT -lt $MAX_RETRIES ]; then
+              echo "⚠️ Invalid response, retrying in 3 seconds..."
+              sleep 3
+            fi
+          done
+          
+          # Fallback decision if AI fails
+          if [ "$SUCCESS" = "false" ]; then
+            echo "🚨 AI API failed after $MAX_RETRIES attempts, using fallback logic"
+            
+            # Smart fallback based on event type
+            if [[ "$CONTEXT_INFO" == *"WORKFLOW_FAILURE"* ]]; then
+              cat > .ai-supervisor/logs/decision.json <<'EOFFALLBACK'
+{
+  "decision": "CREATE_ISSUE",
+  "agent": "POC_AGENT",
+  "urgency": "HIGH",
+  "reason": "Fallback: Workflow failure detected, creating issue for investigation",
+  "title": "Investigate Workflow Failure",
+  "body": "A workflow has failed. Please investigate and fix the issue.",
+  "labels": ["bug", "HIGH", "workflow"],
+  "assignee": null,
+  "estimated_effort": "medium"
+}
+EOFFALLBACK
+            elif [[ "$CONTEXT_INFO" == *"ISSUE_EVENT"* ]] && [[ "$CONTEXT_INFO" == *"opened"* ]]; then
+              cat > .ai-supervisor/logs/decision.json <<'EOFFALLBACK'
+{
+  "decision": "AUTO_LABEL",
+  "agent": null,
+  "urgency": "LOW",
+  "reason": "Fallback: New issue detected, applying automatic labeling",
+  "title": null,
+  "body": "🤖 Thank you for opening this issue. It has been automatically categorized and will be reviewed shortly.",
+  "labels": ["needs-triage"],
+  "assignee": null,
+  "estimated_effort": null
+}
+EOFFALLBACK
+            else
+              cat > .ai-supervisor/logs/decision.json <<'EOFFALLBACK'
+{
+  "decision": "IGNORE",
+  "agent": null,
+  "urgency": "LOW",
+  "reason": "Fallback: No critical issues detected, AI unavailable",
+  "title": null,
+  "body": null,
+  "labels": [],
+  "assignee": null,
+  "estimated_effort": null
+}
+EOFFALLBACK
+            fi
+          fi
+          
+          # Parse and validate decision
+          cat .ai-supervisor/logs/decision.json
+          
+          DECISION=$(jq -r '.decision // "IGNORE"' .ai-supervisor/logs/decision.json)
+          AGENT=$(jq -r '.agent // "null"' .ai-supervisor/logs/decision.json)
+          URGENCY=$(jq -r '.urgency // "LOW"' .ai-supervisor/logs/decision.json)
+          REASON=$(jq -r '.reason // "No reason provided"' .ai-supervisor/logs/decision.json)
+          TITLE=$(jq -r '.title // ""' .ai-supervisor/logs/decision.json)
+          BODY=$(jq -r '.body // ""' .ai-supervisor/logs/decision.json)
+          LABELS=$(jq -r '.labels // [] | join(",")' .ai-supervisor/logs/decision.json)
+          
+          # Export to GitHub outputs (escape properly)
+          echo "decision=$DECISION" >> $GITHUB_OUTPUT
+          echo "agent=$AGENT" >> $GITHUB_OUTPUT
+          echo "urgency=$URGENCY" >> $GITHUB_OUTPUT
+          echo "reason=$REASON" >> $GITHUB_OUTPUT
+          echo "labels=$LABELS" >> $GITHUB_OUTPUT
+          {
+            echo "title<<EOFTITLE"
+            echo "$TITLE"
+            echo "EOFTITLE"
+          } >> $GITHUB_OUTPUT
+          {
+            echo "body<<EOFBODY"
+            echo "$BODY"
+            echo "EOFBODY"
+          } >> $GITHUB_OUTPUT
+          
+          echo "📊 Decision: $DECISION | Agent: $AGENT | Urgency: $URGENCY"
+
+      - name: Execute Decision
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          DECISION="${{ steps.analyze.outputs.decision }}"
+          AGENT="${{ steps.analyze.outputs.agent }}"
+          TITLE="${{ steps.analyze.outputs.title }}"
+          BODY="${{ steps.analyze.outputs.body }}"
+          URGENCY="${{ steps.analyze.outputs.urgency }}"
+          REASON="${{ steps.analyze.outputs.reason }}"
+          LABELS="${{ steps.analyze.outputs.labels }}"
+          REPO="${{ github.repository }}"
+          
+          echo "🎯 Executing decision: $DECISION"
+          echo "📝 Reason: $REASON"
+          
+          # Helper function for GitHub API calls with retry
+          github_api_call() {
+            local method=$1
+            local endpoint=$2
+            local data=$3
+            local max_retries=3
+            local retry_count=0
+            
+            while [ $retry_count -lt $max_retries ]; do
+              response=$(curl -s -w "\n%{http_code}" -X "$method" \
+                "https://api.github.com$endpoint" \
+                -H "Authorization: Bearer $GH_TOKEN" \
+                -H "Accept: application/vnd.github.v3+json" \
+                -d "$data" 2>&1)
+              
+              http_code=$(echo "$response" | tail -n1)
+              
+              if [ "$http_code" = "200" ] || [ "$http_code" = "201" ]; then
+                echo "$response" | sed '$d'
+                return 0
+              fi
+              
+              retry_count=$((retry_count + 1))
+              echo "⚠️ API call failed (HTTP $http_code), retry $retry_count/$max_retries" >&2
+              sleep 2
+            done
+            
+            return 1
+          }
+          
+          case $DECISION in
+            TRIGGER_AGENT)
+              if [ "$AGENT" != "null" ] && [ -n "$AGENT" ]; then
+                echo "🚀 Triggering agent: $AGENT"
+                
+                # Map agent name to workflow file
+                WORKFLOW_FILE=""
+                case $AGENT in
+                  RESEARCH_AGENT) WORKFLOW_FILE="agent-research.yml" ;;
+                  BLUEPRINT_AGENT) WORKFLOW_FILE="agent-blueprint.yml" ;;
+                  POC_AGENT) WORKFLOW_FILE="agent-poc.yml" ;;
+                esac
+                
+                if [ -n "$WORKFLOW_FILE" ]; then
+                  # Trigger workflow dispatch
+                  github_api_call POST "/repos/$REPO/actions/workflows/$WORKFLOW_FILE/dispatches" \
+                    "{\"ref\":\"main\",\"inputs\":{}}" || echo "⚠️ Failed to trigger $AGENT"
+                  
+                  # Comment on related issue if exists
+                  if [ "${{ github.event.issue.number }}" != "" ]; then
+                    github_api_call POST "/repos/$REPO/issues/${{ github.event.issue.number }}/comments" \
+                      "{\"body\":\"🤖 **AI-DAN**: Assigned to **$AGENT** for execution\\n\\n**Urgency:** $URGENCY\\n**Reason:** $REASON\"}"
+                  fi
+                else
+                  echo "⚠️ Unknown agent: $AGENT"
+                fi
+              fi
+              ;;
+              
+            CREATE_ISSUE)
+              if [ -n "$TITLE" ]; then
+                echo "📝 Creating issue: $TITLE"
+                
+                # Parse labels into JSON array
+                LABEL_ARRAY=$(echo "$LABELS" | jq -R 'split(",") | map(select(length > 0))')
+                
+                # Create issue with enhanced metadata
+                ISSUE_BODY="$BODY\n\n---\n🤖 **Auto-generated by AI-DAN**\n**Urgency:** $URGENCY\n**Reason:** $REASON\n**Timestamp:** $(date -u +"%Y-%m-%d %H:%M:%S UTC")"
+                
+                NEW_ISSUE=$(github_api_call POST "/repos/$REPO/issues" \
+                  "{\"title\":\"$TITLE\",\"body\":\"$ISSUE_BODY\",\"labels\":$LABEL_ARRAY}")
+                
+                if [ $? -eq 0 ]; then
+                  ISSUE_NUM=$(echo "$NEW_ISSUE" | jq -r '.number')
+                  echo "✅ Created issue #$ISSUE_NUM"
+                  
+                  # Auto-assign if agent specified
+                  if [ "$AGENT" != "null" ] && [ -n "$AGENT" ]; then
+                    echo "Triggering $AGENT for issue #$ISSUE_NUM"
+                    # Could trigger agent workflow here
+                  fi
+                else
+                  echo "❌ Failed to create issue"
+                fi
+              fi
+              ;;
+              
+            COMMENT)
+              if [ "${{ github.event.issue.number }}" != "" ]; then
+                echo "💬 Adding comment to issue #${{ github.event.issue.number }}"
+                
+                COMMENT_BODY="$BODY\n\n---\n🤖 *AI-DAN Supervisor* | Urgency: $URGENCY"
+                
+                github_api_call POST "/repos/$REPO/issues/${{ github.event.issue.number }}/comments" \
+                  "{\"body\":\"$COMMENT_BODY\"}" || echo "⚠️ Failed to post comment"
+                  
+              elif [ "${{ github.event.pull_request.number }}" != "" ]; then
+                echo "💬 Adding comment to PR #${{ github.event.pull_request.number }}"
+                
+                github_api_call POST "/repos/$REPO/issues/${{ github.event.pull_request.number }}/comments" \
+                  "{\"body\":\"$BODY\"}" || echo "⚠️ Failed to post comment"
+              else
+                echo "ℹ️ No issue or PR context for comment"
+              fi
+              ;;
+              
+            AUTO_LABEL)
+              if [ "${{ github.event.issue.number }}" != "" ] && [ -n "$LABELS" ]; then
+                echo "🏷️ Auto-labeling issue #${{ github.event.issue.number }}"
+                
+                LABEL_ARRAY=$(echo "$LABELS" | jq -R 'split(",") | map(select(length > 0))')
+                
+                github_api_call POST "/repos/$REPO/issues/${{ github.event.issue.number }}/labels" \
+                  "{\"labels\":$LABEL_ARRAY}" || echo "⚠️ Failed to add labels"
+                
+                # Also comment if body provided
+                if [ -n "$BODY" ]; then
+                  github_api_call POST "/repos/$REPO/issues/${{ github.event.issue.number }}/comments" \
+                    "{\"body\":\"$BODY\"}"
+                fi
+              fi
+              ;;
+              
+            AUTO_CLOSE)
+              if [ "${{ github.event.issue.number }}" != "" ]; then
+                echo "🔒 Auto-closing issue #${{ github.event.issue.number }}"
+                
+                # Add final comment before closing
+                if [ -n "$BODY" ]; then
+                  github_api_call POST "/repos/$REPO/issues/${{ github.event.issue.number }}/comments" \
+                    "{\"body\":\"$BODY\\n\\n🤖 Auto-closing: $REASON\"}"
+                fi
+                
+                # Close the issue
+                github_api_call PATCH "/repos/$REPO/issues/${{ github.event.issue.number }}" \
+                  "{\"state\":\"closed\"}" || echo "⚠️ Failed to close issue"
+              fi
+              ;;
+              
+            INVESTIGATE|IGNORE)
+              echo "ℹ️ Decision: $DECISION"
+              echo "📋 Reason: $REASON"
+              
+              if [ "$DECISION" = "IGNORE" ] && [ "${{ github.event_name }}" = "schedule" ]; then
+                echo "✅ All systems operational - no action needed"
+              fi
+              ;;
+              
+            *)
+              echo "❌ Unknown decision: $DECISION"
+              exit 1
+              ;;
+          esac
+          
+          echo "✅ Execution complete"
+
+      - name: Log Decision & State Management
+        if: always()
+        run: |
+          # Save decision log with timestamp for audit trail
+          TIMESTAMP=$(date -u +"%Y-%m-%d-%H-%M-%S")
+          LOG_FILE=".ai-supervisor/logs/decision-$TIMESTAMP.json"
+          
+          cat > "$LOG_FILE" <<EOFLOG
+{
+  "timestamp": "$(date -u +"%Y-%m-%dT%H:%M:%SZ")",
+  "event_type": "${{ github.event_name }}",
+  "decision": "${{ steps.analyze.outputs.decision }}",
+  "agent": "${{ steps.analyze.outputs.agent }}",
+  "urgency": "${{ steps.analyze.outputs.urgency }}",
+  "reason": "${{ steps.analyze.outputs.reason }}",
+  "outcome": "${{ job.status }}"
+}
+EOFLOG
+          
+          echo "📊 Decision logged to $LOG_FILE"
+          cat "$LOG_FILE"
+
+      - name: Cost Tracking & Metrics
+        if: always()
+        run: |
+          # Track API usage for cost management (approximate)
+          cat > .ai-supervisor/logs/metrics.txt <<EOFMETRICS
+Run ID: ${{ github.run_id }}
+Event: ${{ github.event_name }}
+Decision: ${{ steps.analyze.outputs.decision }}
+Duration: ${{ job.status }}
+Timestamp: $(date -u +"%Y-%m-%dT%H:%M:%SZ")
+EOFMETRICS
+          
+          echo "📈 Metrics saved for analysis"
+
+      - name: Notification on Critical Failures
+        if: failure()
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          echo "🚨 Workflow failed - creating alert issue"
+          
+          REPO="${{ github.repository }}"
+          
+          curl -X POST "https://api.github.com/repos/$REPO/issues" \
+            -H "Authorization: Bearer $GH_TOKEN" \
+            -H "Accept: application/vnd.github.v3+json" \
+            -d @- <<EOFISSUE
+{
+  "title": "🚨 AI-DAN Supervisor Failure Alert",
+  "body": "The AI-DAN Supervisor workflow has failed.\n\n**Details:**\n- Run ID: ${{ github.run_id }}\n- Event: ${{ github.event_name }}\n- Time: $(date -u)\n- URL: https://github.com/$REPO/actions/runs/${{ github.run_id }}\n\n**Action Required:**\n1. Review the workflow logs\n2. Check OpenAI API key validity\n3. Verify GitHub token permissions\n4. Investigate any rate limiting issues\n\nThis is an automated alert from AI-DAN.",
+  "labels": ["critical", "ai-supervisor", "infrastructure"]
+}
+EOFISSUE
+          
+          echo "Alert issue created"
