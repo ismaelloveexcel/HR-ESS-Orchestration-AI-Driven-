@@ -16,6 +16,7 @@ import calendarRouter from './calendar';
 import passRouter from './pass';
 import businesscardRouter from './businesscard';
 import portalRouter from './portal';
+import educationRouter from './education';
 import { db } from '../database';
 
 export const apiRouter = Router();
@@ -153,6 +154,20 @@ apiRouter.get('/', (req: Request, res: Response) => {
           { method: 'POST', path: '/check-status', description: 'Check status via form POST' },
           { method: 'GET', path: '/profile', description: 'View full employee profile', auth: true }
         ]
+      },
+      education: {
+        base: '/api/education',
+        description: '📚 Employee Education - UAE Labor Law, Tips, Guides, FAQ',
+        routes: [
+          { method: 'GET', path: '/overview', description: 'Education center overview' },
+          { method: 'GET', path: '/uae-labor-law', description: 'UAE labor law topics list' },
+          { method: 'GET', path: '/uae-labor-law/:topicId', description: 'Get topic content with quiz' },
+          { method: 'GET', path: '/tips', description: 'Tips and guides list' },
+          { method: 'GET', path: '/tips/:tipId', description: 'Get specific tip content' },
+          { method: 'GET', path: '/faq', description: 'Frequently asked questions' },
+          { method: 'POST', path: '/quiz/:topicId/submit', description: 'Submit quiz answers', auth: true },
+          { method: 'GET', path: '/search', description: 'Search all education content' }
+        ]
       }
     },
     uaeCompliance: {
@@ -177,6 +192,7 @@ apiRouter.use('/calendar', calendarRouter);
 apiRouter.use('/pass', passRouter);
 apiRouter.use('/businesscard', businesscardRouter);
 apiRouter.use('/portal', portalRouter);
+apiRouter.use('/education', educationRouter);
 
 // API health check
 apiRouter.get('/health', (req: Request, res: Response) => {
