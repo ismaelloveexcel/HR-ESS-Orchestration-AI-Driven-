@@ -1,6 +1,6 @@
 # HR ESS API Documentation
 
-**Version:** 0.1.0  
+**Version:** 1.0.0  
 **Base URL:** `http://localhost:3000`
 
 Complete API reference for the HR Employee Self-Service System designed for UAE multi-entity organizations.
@@ -12,30 +12,31 @@ Complete API reference for the HR Employee Self-Service System designed for UAE 
 - [System Endpoints](#system-endpoints) - Health check and API info
 - [Authentication](#authentication) - Register and login
 - [Employees](#employee-management) - Employee CRUD operations
-- [Attendance](#attendance-management) - Clock in/out, overtime tracking
+- [Attendance](#attendance-management) - One-tap clock in/out
 - [Leave](#leave-management) - Leave requests with reference numbers
-- [Requests](#employee-requests) - Employee requests tracking
+- [Requests](#employee-requests) - Document requests tracking
 - [Calendar](#calendar--announcements) - Events and announcements
-- [Policies](#policies--labor-law) - Policies and UAE labor law
+- [Policies](#policies) - Company policies and acknowledgments
+- [Pass](#universal-pass) - Employee digital pass
+- [Business Card](#digital-business-card) - Contact sharing
+- [Portal](#mini-portal) - Quick links and status check
+- [Education](#employee-education) - UAE labor law learning
 
 ---
 
 ## System Endpoints
 
-### GET `/` - Landing Page
-Returns welcome information and feature list.
+### GET `/` - Web App
+Mobile-friendly PWA interface.
 
 ### GET `/health` - Health Check  
-Check API server status.
-
-**Response:**
-\`\`\`json
+```json
 {
   "status": "ok",
   "service": "HR ESS API - UAE Multi-Entity System",
-  "version": "0.1.0"
+  "version": "1.0.0"
 }
-\`\`\`
+```
 
 ### GET `/api` - API Information
 Complete list of available endpoints and features.
@@ -44,261 +45,354 @@ Complete list of available endpoints and features.
 
 ## Authentication
 
-### POST `/api/auth/register` - Register User
-
-**Request:**
-\`\`\`json
+### POST `/api/auth/register`
+```json
 {
   "username": "ahmed_ali",
   "password": "SecurePass123!",
   "email": "ahmed@company.ae",
-  "role": "employee"
+  "entityCode": "TC-UAE"
 }
-\`\`\`
+```
 
-### POST `/api/auth/login` - Login
-
-**Request:**
-\`\`\`json
+### POST `/api/auth/login`
+```json
 {
   "username": "ahmed_ali",
   "password": "SecurePass123!"
 }
-\`\`\`
+```
 
 **Response:**
-\`\`\`json
+```json
 {
-  "token": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...",
-  "username": "ahmed_ali",
-  "role": "employee"
+  "token": "eyJhbGciOiJIUzI1NiIs...",
+  "user": { "id": "...", "username": "ahmed_ali", "role": "employee" }
 }
-\`\`\`
+```
+
+### GET `/api/auth/me` 🔒
+Get current user info.
+
+### POST `/api/auth/change-password` 🔒
+Change password.
 
 ---
 
 ## Employee Management
 
-### GET `/api/employees` - List All Employees
-### GET `/api/employees/:id` - Get Employee by ID
-### POST `/api/employees` - Create Employee
-### PUT `/api/employees/:id` - Update Employee
-### DELETE `/api/employees/:id` - Delete Employee
+| Method | Endpoint | Description |
+|--------|----------|-------------|
+| GET | `/api/employees` | List all employees |
+| GET | `/api/employees/:id` | Get employee by ID |
+| GET | `/api/employees/:id/summary` | Get employee summary |
+| POST | `/api/employees` | Create employee (Admin/HR) |
+| PUT | `/api/employees/:id` | Update employee |
+| DELETE | `/api/employees/:id` | Delete employee |
 
 ---
 
 ## Attendance Management
 
-### POST `/api/attendance/clock-in` - Clock In
+### POST `/api/attendance/quick` 🔒 ⭐
+**One-tap clock in/out** - automatically detects if clocking in or out.
 
-Records clock-in with optional geolocation for office/site/remote workers.
-
-**Request:**
-\`\`\`json
+```json
 {
-  "employeeId": "EMP001",
-  "workLocation": "office",
-  "location": {
-    "lat": 25.2048,
-    "lon": 55.2708
-  }
+  "location": { "lat": 25.2048, "lon": 55.2708 }
 }
-\`\`\`
+```
 
-### POST `/api/attendance/clock-out` - Clock Out
+**Response:**
+```json
+{
+  "action": "clock_in",
+  "message": "Clocked in successfully",
+  "time": "09:00:00",
+  "location": "office"
+}
+```
 
-Calculates hours worked and overtime (paid/offset).
+### GET `/api/attendance/status` 🔒
+Get current clock status for UI display.
 
-### GET `/api/attendance/employee/:employeeId` - Get Attendance Records
-### GET `/api/attendance/report/:employeeId/:year/:month` - Monthly Report
+```json
+{
+  "status": "clocked_in",
+  "clockedInAt": "2026-02-05T09:00:00Z",
+  "action": "Clock Out",
+  "message": "Working for 4h 30m"
+}
+```
 
-**Response includes:**
-- Total working days
-- Present/absent/late days  
-- Regular and overtime hours
-- Overtime paid vs offset
+### POST `/api/attendance/clock-in` 🔒
+Manual clock in with location.
+
+### POST `/api/attendance/clock-out` 🔒
+Manual clock out.
+
+### GET `/api/attendance/employee/:employeeId` 🔒
+Get attendance records.
 
 ---
 
 ## Leave Management
 
-### POST `/api/leave/request` - Submit Leave Request
+### POST `/api/leave` 🔒
+Submit leave request.
 
-**Request:**
-\`\`\`json
+```json
 {
-  "employeeId": "EMP001",
   "type": "annual",
   "startDate": "2026-03-10",
   "endDate": "2026-03-15",
   "reason": "Family vacation"
 }
-\`\`\`
+```
 
-**Response includes auto-generated reference number:** `LV12345678`
+**Response includes reference number:** `LV-202603-0001`
 
-### GET `/api/leave/reference/:refNumber` - Track by Reference Number
+### GET `/api/leave/balance` 🔒
+Get leave balance (annual: 30 days UAE standard).
 
-Employees can check status anytime using reference number.
+### GET `/api/leave/:id` 🔒
+Get leave request details.
 
-### GET `/api/leave/balance/:employeeId/:year` - Get Leave Balance
-
-**Includes:**
-- Annual leave (30 days - UAE standard)
-- Sick leave  
-- Offset days (earned from overtime)
-- Unpaid leave
-
-### PATCH `/api/leave/:id/status` - Approve/Reject Leave
+### PATCH `/api/leave/:id/approve` 🔒 (Manager/HR)
+### PATCH `/api/leave/:id/reject` 🔒 (Manager/HR)
+### PATCH `/api/leave/:id/cancel` 🔒
 
 ---
 
 ## Employee Requests
 
-All request types supported: document, certificate, loan, IT support, facility, etc.
+### GET `/api/requests/types`
+Available request types (salary certificate, NOC, etc.)
 
-### POST `/api/requests` - Submit Request
+### POST `/api/requests` 🔒
+Submit document request.
 
-**Request:**
-\`\`\`json
+```json
 {
-  "employeeId": "EMP001",
-  "type": "certificate",
-  "title": "Employment Certificate",
-  "description": "Need for visa application",
-  "priority": "high"
+  "type": "salary_certificate",
+  "purpose": "Bank loan application",
+  "urgent": false
 }
-\`\`\`
+```
 
-**Response includes reference number:** `CE12345678`
+**Response includes reference:** `REQ-202602-0001`
 
-### GET `/api/requests/reference/:refNumber` - Track Request
-
-Check status with reference number - no login required.
-
-### GET `/api/requests/employee/:employeeId` - Employee's Requests
-### GET `/api/requests/pending` - Pending Requests (HR/Admin)
-### PATCH `/api/requests/:id/status` - Update Status
-
-**Tracks full status history** for transparency.
+### GET `/api/requests/:id` 🔒
+### GET `/api/requests/my` 🔒
+### PATCH `/api/requests/:id/process` 🔒 (HR)
+### PATCH `/api/requests/:id/complete` 🔒 (HR)
 
 ---
 
 ## Calendar & Announcements
 
-### GET `/api/calendar/events` - Get Calendar Events
-Query params: `startDate`, `endDate`, `type`
+### GET `/api/calendar/events`
+Query: `?startDate=2026-02-01&endDate=2026-02-28&type=holiday`
 
-**Event types:** deadline, training, webinar, meeting, holiday, birthday
+### GET `/api/calendar/upcoming`
+Next 30 days of events.
 
-### POST `/api/calendar/events` - Create Event
-### GET `/api/calendar/events/upcoming` - Next 30 Days
+### POST `/api/calendar/events` 🔒 (Admin/HR)
 
-### GET `/api/calendar/announcements` - Get Announcements
+### GET `/api/calendar/announcements`
+Birthdays, new joiners, promotions.
 
-**Announcement types:**
-- birthday
-- new-joiner  
-- leaver
-- promotion
-- achievement
-- general
-
-### POST `/api/calendar/announcements` - Create Announcement
+### GET `/api/calendar/today`
+Today's summary.
 
 ---
 
-## Policies & Labor Law
+## Policies
 
-### GET `/api/policies` - List Policies
-Query params: `category`, `country`, `requiresAck`
+### GET `/api/policies`
+List active policies.
 
-**Categories:** hr-policy, labor-law, company-policy, procedure, guideline
+### GET `/api/policies/:id`
+Get policy details.
 
-### POST `/api/policies/:policyId/acknowledge` - Acknowledge Policy
+### POST `/api/policies/:id/acknowledge` 🔒
+Acknowledge reading a policy.
 
-**Required for UAE labor law compliance.**
+### GET `/api/policies/pending` 🔒
+Policies requiring acknowledgment.
 
-**Request:**
-\`\`\`json
+---
+
+## Universal Pass
+
+### GET `/api/pass/my` 🔒
+Get current user's pass.
+
+```json
 {
-  "employeeId": "EMP001",
-  "signature": "Ahmed Ali"
+  "id": "PASS-EMP001",
+  "type": "employee",
+  "personal": {
+    "name": "Ahmed Al Mansoori",
+    "position": "Software Engineer",
+    "entity": "TechCorp UAE"
+  },
+  "stage": "confirmed",
+  "menu": [...]
 }
-\`\`\`
+```
 
-### GET `/api/policies/pending-acks/:employeeId` - Pending Acknowledgments
+### GET `/api/pass/:id/qr`
+Generate QR code for pass.
 
-Returns policies employee must acknowledge.
+### GET `/api/pass/:id/profile`
+Full profile for QR scan destination.
 
-### GET `/api/policies/labor-law/topics` - Labor Law Education
+### POST `/api/pass/candidate` 🔒 (HR)
+Create candidate pass.
 
-Educational content about UAE labor law with:
-- Law references (Federal Decree-Law No. 33 of 2021)
-- Examples
-- Quiz questions
-- Related policies
+---
+
+## Digital Business Card
+
+### GET `/api/businesscard/my` 🔒
+Get my business card.
+
+### GET `/api/businesscard/my/vcard`
+Download vCard file.
+
+### GET `/api/businesscard/my/qr`
+QR code for contact sharing.
+
+### PATCH `/api/businesscard/:id/visibility` 🔒
+Control which fields are visible.
+
+```json
+{
+  "phone": true,
+  "email": true,
+  "position": true,
+  "department": false
+}
+```
+
+---
+
+## Mini Portal
+
+### GET `/api/portal/home` 🔒 ⭐
+**Complete portal data in one call** - greeting, stats, quick links, upcoming events.
+
+### GET `/api/portal/quick-links` 🔒
+Available quick actions with pending counts.
+
+```json
+{
+  "links": [
+    { "id": "leave", "label": "Leave", "icon": "calendar", "badge": 2 },
+    { "id": "documents", "label": "Documents", "icon": "document" }
+  ]
+}
+```
+
+### GET `/api/portal/check-status/:reference` ⭐
+**Public** - Check request status by reference number.
+
+```json
+{
+  "found": true,
+  "reference": "LV-202602-0001",
+  "type": "leave",
+  "status": { "code": "pending", "label": "Pending Approval" },
+  "details": { "type": "Annual Leave", "startDate": "2026-03-10" }
+}
+```
+
+### GET `/api/portal/profile` 🔒
+Comprehensive employee profile view.
+
+---
+
+## Employee Education
+
+### GET `/api/education/overview`
+Education center sections.
+
+### GET `/api/education/uae-labor-law`
+List of UAE labor law topics.
+
+### GET `/api/education/uae-labor-law/:topicId`
+Topic content with quiz.
+
+**Topics:**
+- `working-hours` - Working hours and overtime
+- `annual-leave` - 30 days entitlement
+- `sick-leave` - 90 days (15 full, 30 half, 45 unpaid)
+- `maternity-paternity` - 60 days / 5 days
+- `end-of-service` - Gratuity calculation
+- `notice-period` - 30-90 days
+- `probation` - 6 months max
+
+### GET `/api/education/tips`
+Tips and guides.
+
+### GET `/api/education/faq`
+Frequently asked questions.
+
+### POST `/api/education/quiz/:topicId/submit` 🔒
+Submit quiz answers, get score.
+
+### GET `/api/education/search?q=leave`
+Search all education content.
+
+---
+
+## Authentication Notes
+
+🔒 = Requires JWT token in header:
+```
+Authorization: Bearer <token>
+```
+
+⭐ = Recommended endpoint for common operations.
 
 ---
 
 ## UAE-Specific Features
 
-✅ **30-day annual leave** (UAE standard)  
-✅ **Multi-entity support** (3 entities under same group)  
-✅ **5 or 6-day work week** configuration  
-✅ **Offset days** earned from overtime  
-✅ **Geolocation** tracking (office/site/remote/outside)  
-✅ **Policy acknowledgment** tracking (legal requirement)  
-✅ **Reference number** tracking for all requests  
-✅ **UAE labor law** education module
+| Feature | Implementation |
+|---------|----------------|
+| 30-day annual leave | UAE labor law standard |
+| Multi-entity support | Separate entity codes |
+| 5 or 6-day work week | Configurable |
+| Offset days | Earned from overtime |
+| GPS validation | Office location check |
+| Policy acknowledgment | Legal compliance tracking |
+| Reference numbers | All requests trackable |
+| Labor law education | Interactive quizzes |
 
 ---
 
 ## Error Responses
 
-- `200` OK
-- `201` Created  
-- `204` No Content
-- `400` Bad Request
-- `401` Unauthorized
-- `404` Not Found
-- `409` Conflict
-- `500` Internal Server Error
+| Code | Meaning |
+|------|---------|
+| 200 | OK |
+| 201 | Created |
+| 400 | Bad Request |
+| 401 | Unauthorized |
+| 403 | Forbidden |
+| 404 | Not Found |
+| 500 | Server Error |
 
-**Format:**
-\`\`\`json
+```json
 {
-  "error": "Error message"
+  "error": "Error message",
+  "message": "Detailed description"
 }
-\`\`\`
-
----
-
-## Reference Number System
-
-All requests generate unique tracking numbers:
-
-| Type | Prefix | Example |
-|------|--------|---------|
-| Leave | LV | LV12345678 |
-| Certificate | CE | CE12345678 |
-| Document | DO | DO12345678 |
-| IT Support | IT | IT12345678 |
-| Other | XX | XX12345678 |
-
-Employees can check status anytime using reference number.
-
----
-
-## Next Steps
-
-1. **Database Integration** - PostgreSQL for production
-2. **JWT Middleware** - Protect routes
-3. **File Upload** - Document management
-4. **Email Notifications** - Request updates
-5. **Frontend** - React/Vue.js portal
+```
 
 ---
 
 **Last Updated:** 2026-02-05  
-**API Version:** 0.1.0
+**API Version:** 1.0.0

@@ -1,6 +1,6 @@
 {
   "name": "hr-ess-orchestration",
-  "version": "0.1.0",
+  "version": "1.0.0",
   "description": "AI-powered HR Employee Self-Service system for UAE multi-entity contexts",
   "main": "dist/index.js",
   "scripts": {
@@ -10,7 +10,7 @@
     "test": "jest",
     "lint": "eslint src/**/*.ts"
   },
-  "keywords": ["hr", "ess", "employee-self-service", "uae"],
+  "keywords": ["hr", "ess", "employee-self-service", "uae", "multi-entity"],
   "author": "",
   "license": "MIT",
   "dependencies": {
@@ -18,7 +18,8 @@
     "dotenv": "^16.3.1",
     "jsonwebtoken": "^9.0.2",
     "bcryptjs": "^2.4.3",
-    "cors": "^2.8.5"
+    "cors": "^2.8.5",
+    "uuid": "^9.0.0"
   },
   "devDependencies": {
     "@types/express": "^4.17.21",
@@ -26,6 +27,7 @@
     "@types/jsonwebtoken": "^9.0.5",
     "@types/bcryptjs": "^2.4.6",
     "@types/cors": "^2.8.17",
+    "@types/uuid": "^9.0.7",
     "typescript": "^5.3.3",
     "ts-node": "^10.9.2",
     "@types/jest": "^29.5.11",
