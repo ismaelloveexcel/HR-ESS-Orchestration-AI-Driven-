@@ -2,36 +2,38 @@
 
 ## Overview
 
-This is an **AI-orchestrated HR Employee Self-Service (ESS) system** for UAE multi-entity organizations. The project has two layers:
+This is an **AI-orchestrated HR Employee Self-Service (ESS) system** framework designed for UAE multi-entity organizations. The project has two layers:
 
-1. **AI-DAN Supervisor** (v2.0): GitHub Actions workflow for autonomous orchestration
-2. **HR ESS Application**: Node.js/TypeScript REST API with **11 modules** and **50+ endpoints**
+1. **AI-DAN Supervisor** (v2.0): Deployed GitHub Actions workflow for autonomous orchestration and issue management
+2. **HR ESS Application**: Node.js/TypeScript REST API with 50+ endpoints across 11 HR modules
 
----
+## Current State - VERIFIED ✅
 
-## Current State
+**AI-DRIVEN DEVELOPMENT**: This repository minimizes manual intervention by leveraging AI agents and supervisors. The AI-DAN Supervisor orchestrates three specialized agents to handle development tasks autonomously.
 
-| Component | Status |
-|-----------|--------|
-| Backend API | ✅ Complete (11 modules) |
-| Web App (PWA) | ✅ Complete |
-| Mobile App (Expo) | ✅ Ready |
-| AI Workflows | ✅ Deployed |
-| Database | ⚠️ In-memory (needs PostgreSQL) |
-| Production Deploy | ⚠️ Pending |
+**PROJECT STATUS**: Application reviewed and verified. Core HR modules implemented and tested. PWA and mobile apps ready.
+
+| Component | Status | Notes |
+|-----------|--------|-------|
+| Backend API | ✅ Complete | 11 modules, 50+ endpoints |
+| Web App (PWA) | ✅ Complete | Mobile-friendly, works offline |
+| Mobile App | ✅ Ready | Expo Go React Native |
+| AI Workflows | ✅ Deployed | 4 workflows active |
+| Database | ⚠️ In-memory | PostgreSQL migration pending |
+| Production | ⚠️ Pending | Azure configured |
 
 ### Implemented Modules (11)
 ```
-auth        employees    attendance   leave      requests
-calendar    policies     pass         businesscard
-portal      education
+auth         employees     attendance    leave        requests
+calendar     policies      pass          businesscard portal
+education
 ```
 
-### Models (8)
-```
-Employee    Attendance   Leave        EmployeeRequest
-Calendar    Policy       Pass         BusinessCard
-```
+### Priority Modules (Not Yet Built)
+1. **Recruitment Process** - Applicant tracking, job postings, interview scheduling
+2. **Performance Management** - Goals, reviews, feedback, evaluations
+3. **Contract Management** - Generation, signing, storage
+4. **Payroll Integration** - Payslip access, WPS compliance
 
 ---
 
@@ -41,10 +43,11 @@ Calendar    Policy       Pass         BusinessCard
 - **Runtime**: Node.js 18+
 - **Language**: TypeScript 5.3
 - **Framework**: Express 4.18
-- **Auth**: JWT + bcrypt + RBAC
-- **Database**: In-memory Map (PostgreSQL-ready)
+- **Auth**: JWT + bcrypt + RBAC (4 roles: admin, hr_manager, manager, employee)
+- **Database**: In-memory Map (PostgreSQL-ready via abstraction layer)
+- **AI Orchestration**: AI-DAN Supervisor (GPT-4 Turbo via .github/workflows/ai-controller.yml)
 
-### Repository Structure
+### Module Structure
 ```
 src/
 ├── api/              # 11 route modules
@@ -171,23 +174,35 @@ Authorization: Bearer <token>
 ## AI Agent System
 
 ### AI-DAN Supervisor
-File: `.github/workflows/ai-controller.yml`
+The `.github/workflows/ai-controller.yml` orchestrates three specialized agents:
+- **RESEARCH_AGENT**: Information gathering, tool evaluation, documentation
+- **BLUEPRINT_AGENT**: Architecture design, system diagrams, technical planning
+- **POC_AGENT**: Code implementation, feature development, bug fixes
 
-**Triggers**: Issues, PRs, Schedule (4h), Manual
-**Actions**: TRIGGER_AGENT, CREATE_ISSUE, LABEL, COMMENT, CLOSE
+**Triggers**: Issues, PRs, Schedule (4h), Manual dispatch
+**Actions**: TRIGGER_AGENT, CREATE_ISSUE, LABEL, COMMENT, UPDATE_STATUS, CLOSE
 
 ### Specialized Agents
-| Agent | Purpose | Output |
-|-------|---------|--------|
+| Agent | Purpose | Output Directory |
+|-------|---------|------------------|
 | RESEARCH | Information gathering, evaluation | `/reports/` |
 | BLUEPRINT | Architecture, diagrams, planning | `/blueprints/` |
 | POC | Code implementation, features | `/app/` |
 
+### Available Subagents (VSCode/Cursor)
+- **AIAgentExpert**: AI app/workflow development with Microsoft Agent Framework
+- **DataAnalysisExpert**: Data file analysis and insights
+- **Plan**: Research and outline multi-step plans
+
+### Leveraging Agents
+**For new features**: Let AI agents handle the work - supervisor routes to appropriate agent based on task type. Create issues for complex features and let the agent system break down and implement incrementally.
+
 ### Agent-First Workflow
-1. Create GitHub Issue with request
-2. AI-DAN classifies and routes
-3. Agent executes and commits
-4. Results pushed to repo
+1. Create GitHub Issue with request in plain English
+2. AI-DAN analyzes and classifies the request
+3. Routes to appropriate specialist agent
+4. Agent executes, generates output, commits to repo
+5. Updates issue with results and links
 
 ---
 
