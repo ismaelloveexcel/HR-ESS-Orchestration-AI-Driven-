@@ -108,7 +108,7 @@ This repository is in **Phase 1 Complete / Phase 2 Pending**:
 npm init -y
 
 # 2. Install TypeScript and dependencies
-npm install --save-dev typescript @types/node ts-node
+npm install --save-dev typescript @types/node ts-node @types/express
 npm install express dotenv
 
 # 3. Create TypeScript configuration

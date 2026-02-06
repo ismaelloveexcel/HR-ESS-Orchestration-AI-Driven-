@@ -1,5 +1,8 @@
 {
     "recommendations": [
-        "github.vscode-github-actions"
+        "github.vscode-github-actions",
+        "github.codespaces",
+        "github.remotehub",
+        "ms-azuretools.vscode-azure-github-copilot"
     ]
 }
