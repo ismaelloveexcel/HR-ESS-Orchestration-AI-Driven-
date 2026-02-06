@@ -8,9 +8,17 @@ on:
   pull_request:
     types: [opened, edited, labeled, closed, reopened, synchronize, review_requested]
   # 3. MONITOR WORKFLOW SUCCESS/FAILURE
-  workflow_run:
-    workflows: ["Deploy to Azure 🚀", "Agent - Research Specialist 🕵️", "Agent - Blueprint Architect 🏗️", "Agent - POC Developer 💻"]
-    types: [completed, requested, in_progress]
+  # NOTE: Disabled until agent workflows are created to prevent workflow failures.
+  # These workflows don't exist yet, which was causing the AI controller to fail on every run.
+  # See CURRENT-STATE.md for details on what's missing and why.
+  # Uncomment when you add:
+  # - Deploy to Azure workflow (.github/workflows/deploy-azure.yml)
+  # - Agent - Research Specialist workflow (.github/workflows/agent-research.yml)
+  # - Agent - Blueprint Architect workflow (.github/workflows/agent-blueprint.yml)
+  # - Agent - POC Developer workflow (.github/workflows/agent-poc.yml)
+  # workflow_run:
+  #   workflows: ["Deploy to Azure 🚀", "Agent - Research Specialist 🕵️", "Agent - Blueprint Architect 🏗️", "Agent - POC Developer 💻"]
+  #   types: [completed, requested, in_progress]
   # 4. PERIODIC HEALTH CHECKS (Runs every 4 hours instead of 6 for more frequent monitoring)
   schedule:
     - cron: '0 */4 * * *'
@@ -218,8 +226,7 @@ jobs:
           
           # Enhanced prompt with more specific instructions
           PROMPT=$(cat <<'EOFPROMPT'
-You are AI-DAN, the autonomous supervisor of the HR ESS Orchestration repository.
-Your mission: Maintain repository health, accelerate development, and minimize human intervention.
+You are AI-DAN, the autonomous supervisor of the HR ESS Orchestration repository. Your mission is to maintain repository health, accelerate development, and minimize human intervention.
 
 **CURRENT CONTEXT:**
 ${CONTEXT_PLACEHOLDER}
