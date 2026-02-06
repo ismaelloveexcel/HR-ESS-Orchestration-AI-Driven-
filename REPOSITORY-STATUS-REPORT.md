@@ -217,7 +217,7 @@ $ curl -X POST http://localhost:3000/api/attendance/clock-in \
   "employeeId": "EMP001",
   "date": "2026-02-06",
   "clockIn": "2026-02-06T05:00:37.574Z",
-  "location": {"lat": 25.2048, "lon": 55.2708},
+  "location": {"lat": 25.2048, "lon": 55.2708}, // Example coordinates (Dubai, UAE)
   "workLocation": "office",
   "status": "present"
 }
@@ -249,7 +249,7 @@ The following enhancements are recommended before production deployment:
 4. Configure specific CORS origins (not wildcard)
 5. Add default JWT_SECRET check (fail fast in production if using default)
 
-⚠️**Medium Priority:**
+⚠️ **Medium Priority:**
 6. Implement audit logging for sensitive operations
 7. Add request sanitization to prevent XSS
 8. Set up HTTPS/TLS for production
