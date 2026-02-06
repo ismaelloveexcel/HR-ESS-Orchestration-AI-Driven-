@@ -92,12 +92,36 @@ The **AI-DAN Supervisor** will automatically read your issue, classify it, and d
 ├── agent-poc.yml           # 🚀 PoC developer
 └── deploy-azure.yml        # ☁️ Azure deployment
 
-app/                        # PoC code (auto-deployed to Azure)
+src/                        # Main application code
+├── api/                    # API route handlers
+│   ├── auth.ts             # Authentication
+│   ├── employees.ts        # Employee management
+│   ├── attendance.ts       # Clock in/out
+│   ├── leave.ts            # Leave requests
+│   ├── requests.ts         # Document requests
+│   ├── policies.ts         # Company policies
+│   ├── calendar.ts         # Events & announcements
+│   ├── pass.ts             # Universal Pass
+│   ├── businesscard.ts     # Digital business card
+│   ├── portal.ts           # Mini portal (Quick Links, Status)
+│   └── education.ts        # Employee education
+├── database/               # Database layer
+├── middleware/             # Auth & error handling
+└── models/                 # Data models
+
+public/                     # Web app (PWA)
+├── index.html              # Mobile-friendly UI
+├── manifest.json           # PWA manifest
+├── sw.js                   # Service worker
+└── offline.html            # Offline fallback
+
+mobile/                     # Expo Go app (React Native)
+├── App.tsx                 # Main app component
+└── src/                    # Mobile source
+
 blueprints/                 # Architecture outputs
 reports/                    # Research findings
-data/output/                # Structured agent data (JSON/YAML)
-src/                        # Main application code (Node.js/TypeScript)
-tasks/                      # Source task definitions
+tasks/                      # Task definitions
 ```
 
 ---
@@ -131,17 +155,42 @@ Server runs on `http://localhost:3000`
 
 ## 🚀 Application Features (Already Built)
 
-The HR ESS API includes these UAE-compliant features:
+The HR ESS system includes these UAE-compliant features:
+
+### Core API Modules
 
 | Module | Features |
 |--------|----------|
-| **Authentication** | JWT-based register/login |
+| **Authentication** | JWT-based register/login, role-based access |
 | **Employee Management** | Full CRUD with multi-entity support |
-| **Attendance** | Clock in/out, geolocation, overtime tracking |
+| **Attendance** | One-tap clock in/out, GPS validation, overtime |
 | **Leave Management** | UAE 30-day leave, offset days, reference tracking |
 | **Employee Requests** | Auto reference numbers, status tracking |
 | **Calendar & Events** | Training, deadlines, announcements |
 | **Policies** | UAE labor law compliance, acknowledgments |
+
+### Universal Pass System
+
+| Feature | Description |
+|---------|-------------|
+| **Employee Pass** | Digital ID card with QR code |
+| **Business Card** | vCard export, QR sharing, admin visibility control |
+| **Mini Portal** | Quick Links, Check Status, View Profile |
+
+### Employee Education
+
+| Section | Content |
+|---------|---------|
+| **UAE Labor Law** | 7 topics with interactive quizzes |
+| **Tips & Guides** | Clock-in, leave, documents best practices |
+| **FAQ** | 8 common employee questions |
+
+### Mobile Experience
+
+| Platform | Status |
+|----------|--------|
+| **Web App (PWA)** | ✅ Ready - works on any browser |
+| **Expo Go App** | ✅ Ready - React Native mobile app |
 
 ### Test the API
 
@@ -198,17 +247,17 @@ The AI-DAN Supervisor v2.0 provides:
 
 ---
 
-## 🎯 Next Steps for Full Automation
+## 🎯 Next Steps
 
-1. **Enhance Agent Intelligence**: Upgrade agents to use AI for actual task execution
-2. **Database Integration**: Connect PostgreSQL for persistent data
-3. **Frontend UI**: Build React/Vue.js interface
-4. **Production Deployment**: Deploy to Azure Web Apps
+1. **Database**: Connect PostgreSQL for persistent data (currently in-memory)
+2. **Production Deploy**: Deploy to Azure Web Apps with CI/CD
+3. **Apple/Google Wallet**: Generate actual wallet passes
+4. **Push Notifications**: Employee alerts and reminders
 
 ### Self-Building Capability
 
 Create an issue to have the system build itself:
-> "Generate enhanced workflow files for the Blueprint and POC agents with AI execution capabilities."
+> "Add email notifications for leave approval"
 
 ---
 
