@@ -156,6 +156,8 @@ Logs Results & Metrics
 - [Getting Started](./GETTING-STARTED.md) - Development guide
 - [Deployment](./DEPLOYMENT.md) - Deployment instructions
 - [Workflow Enhancements](.github/workflows/AI-CONTROLLER-ENHANCEMENTS.md) - AI-DAN details
+- [GitHub Large PR Optimization](./docs/GITHUB-LARGE-PR-OPTIMIZATION.md) - Understanding GitHub's large PR message
+- [Large PR Quick Reference](./docs/GITHUB-LARGE-PR-QUICK-REFERENCE.md) - Quick tips for large PRs
 
 ---
 
