@@ -155,23 +155,34 @@ self.addEventListener('sync', (event) => {
 
 // Sync queued clock-in actions
 async function syncClockIn() {
-  const db = await openDB();
-  const queue = await db.getAll('clock-in-queue');
-  
-  for (const item of queue) {
-    try {
-      await fetch('/api/attendance/clock-in', {
-        method: 'POST',
-        headers: { 
-          'Content-Type': 'application/json',
-          'Authorization': `Bearer ${item.token}`
-        },
-        body: JSON.stringify(item.data)
-      });
-      await db.delete('clock-in-queue', item.id);
-    } catch (error) {
-      console.error('[SW] Failed to sync clock-in:', error);
+  try {
+    const db = await openDB();
+    
+    // Validate database schema exists
+    if (!db) {
+      console.error('[SW] Failed to open database');
+      return;
     }
+    
+    const queue = await db.getAll('clock-in-queue');
+    
+    for (const item of queue) {
+      try {
+        await fetch('/api/attendance/clock-in', {
+          method: 'POST',
+          headers: { 
+            'Content-Type': 'application/json',
+            'Authorization': `Bearer ${item.token}`
+          },
+          body: JSON.stringify(item.data)
+        });
+        await db.delete('clock-in-queue', item.id);
+      } catch (error) {
+        console.error('[SW] Failed to sync clock-in:', error);
+      }
+    }
+  } catch (error) {
+    console.error('[SW] Failed to sync clock-in queue:', error);
   }
 }
 

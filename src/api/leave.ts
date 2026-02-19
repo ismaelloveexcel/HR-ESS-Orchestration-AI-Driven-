@@ -95,8 +95,7 @@ router.post('/request', authenticate, (req: AuthenticatedRequest, res: Response)
       startDate,
       endDate,
       reason,
-      documents,
-      emergencyContact
+      documents
     } = req.body;
 
     const employeeId = req.user?.employeeId;

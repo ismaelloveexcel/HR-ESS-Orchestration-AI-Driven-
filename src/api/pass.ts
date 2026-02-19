@@ -21,7 +21,10 @@ import {
 
 const router = Router();
 
-// In-memory pass storage (would be in database)
+// ⚠️ CRITICAL: In-memory pass storage - DATA WILL BE LOST ON SERVER RESTART
+// This is NOT suitable for production use. All pass data will be permanently lost
+// when the server restarts. Must be replaced with persistent database storage
+// before production deployment.
 const passes = new Map<string, UniversalPass>();
 const candidatePasses = new Map<string, UniversalPass>();
 
@@ -643,9 +646,9 @@ router.get('/candidates/list', authenticate, authorize('admin', 'hr_manager', 'm
 /**
  * @route GET /api/pass/types
  * @desc Get pass type configurations
- * @access Public
+ * @access Authenticated
  */
-router.get('/types/config', (req, res: Response) => {
+router.get('/types/config', authenticate, (req: AuthenticatedRequest, res: Response) => {
   res.json({
     types: ['candidate', 'manager', 'employee'],
     stages: STAGE_CONFIGS,

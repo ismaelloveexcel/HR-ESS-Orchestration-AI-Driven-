@@ -57,6 +57,16 @@ export const authenticate = (req: AuthenticatedRequest, res: Response, next: Nex
 
     const token = authHeader.substring(7);
     const secret = process.env.JWT_SECRET || 'default_secret_change_in_production';
+    
+    // Security check: Fail fast if using default secret in production
+    if (secret === 'default_secret_change_in_production' && process.env.NODE_ENV === 'production') {
+      console.error('[SECURITY] JWT_SECRET not set in production environment');
+      res.status(500).json({ 
+        error: 'Server configuration error', 
+        message: 'Authentication system not properly configured' 
+      });
+      return;
+    }
 
     const decoded = jwt.verify(token, secret) as JWTPayload;
     

@@ -87,14 +87,12 @@ jobs:
         uses: azure/login@v1
         with:
           creds: ${{ secrets.AZURE_CREDENTIALS }}
-        continue-on-error: true
           
       - name: Deploy to Azure Web App (Staging)
         uses: azure/webapps-deploy@v2
         with:
           app-name: ${{ env.AZURE_WEBAPP_NAME }}-staging
           package: .
-        continue-on-error: true
           
       - name: Post-deployment health check
         run: |
@@ -122,14 +120,12 @@ jobs:
         uses: azure/login@v1
         with:
           creds: ${{ secrets.AZURE_CREDENTIALS }}
-        continue-on-error: true
           
       - name: Deploy to Azure Web App (Production)
         uses: azure/webapps-deploy@v2
         with:
           app-name: ${{ env.AZURE_WEBAPP_NAME }}
           package: .
-        continue-on-error: true
           
       - name: Post-deployment verification
         run: |

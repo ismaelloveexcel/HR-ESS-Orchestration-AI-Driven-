@@ -10,7 +10,6 @@ import { db } from '../database';
 import { authenticate, authorize, AuthenticatedRequest } from '../middleware/auth';
 import { 
   BusinessCard, 
-  BusinessCardFields,
   DEFAULT_VISIBILITY,
   generateVCard,
   generateContactQRData,
@@ -20,7 +19,10 @@ import {
 
 const router = Router();
 
-// In-memory storage (would be in database)
+// ⚠️ CRITICAL: In-memory storage - DATA WILL BE LOST ON SERVER RESTART
+// This is NOT suitable for production use. All business card data and settings
+// will be permanently lost when the server restarts, including the initialization
+// below. Must be replaced with persistent database storage before production deployment.
 const businessCards = new Map<string, BusinessCard>();
 const entitySettings = new Map<string, EntityBusinessCardSettings>();
 
